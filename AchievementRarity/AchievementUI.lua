@@ -70,4 +70,13 @@ local function InstallHooks()
     EventRegistry:RegisterCallback("AchievementFrameAchievement.OnLeave", OnRowLeave, G)
 end
 
+-- Re-run the rarity paint over the currently-shown rows — used when the scope
+-- option flips so the visible %/colours update without waiting for a refill.
+function G.RepaintRows()
+    local scrollBox = AchievementFrameAchievements and AchievementFrameAchievements.ScrollBox
+    if scrollBox and G.achievementUIHooked then
+        scrollBox:ForEachFrame(PaintRarity)
+    end
+end
+
 G.OnAchievementUILoaded(InstallHooks)

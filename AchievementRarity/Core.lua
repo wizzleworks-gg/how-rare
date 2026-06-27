@@ -5,14 +5,36 @@ local _, G = ...
 
 AchievementRarity = G -- global handle for /dump debugging
 
--- The player's rarity denominator: own region for US/EU, global for everyone
--- else (kr/tw/cn) — mirrors the site's standingRegionFor.
+-- The player's home region: own region for US/EU, global for everyone else
+-- (kr/tw/cn) — mirrors the site's standingRegionFor. This is the "region" scope's
+-- target; "global" scope always reads the global column.
 local REGION_BY_ID = { [1] = "us", [3] = "eu" }
 G.region = REGION_BY_ID[GetCurrentRegion()] or "global"
 
 -- Index into the packed {us, eu, global} count triples in Data/Rarity.lua.
+-- Read via G.ScopeIndex(scope), which resolves the active scope to a column.
 local REGION_INDEX = { us = 1, eu = 2, global = 3 }
-G.regionIndex = REGION_INDEX[G.region]
+
+-- Rarity scope: "region" (the player's home region, default) or "global". A saved
+-- option (Options.lua); every rarity surface and the public API read it through
+-- G.Scope(), and the API also accepts a per-call override. Defensive against a
+-- not-yet-loaded saved-vars table (treated as the region default until loaded).
+function G.Scope()
+    return (AchievementRarityDB and AchievementRarityDB.scope == "global") and "global" or "region"
+end
+
+-- The data region a scope reads: "global" → global; "region"/default → home.
+function G.ScopeRegion(scope)
+    if (scope or G.Scope()) == "global" then
+        return "global"
+    end
+    return G.region
+end
+
+-- The {us, eu, global} column index for a scope.
+function G.ScopeIndex(scope)
+    return REGION_INDEX[G.ScopeRegion(scope)]
+end
 
 G.BRAND = "gratz.gg"
 
@@ -158,46 +180,59 @@ function G.FormatPct(pct)
     return math.floor(pct + 0.5) .. "%"
 end
 
--- The player's region attainment as a raw percent (0–100), or nil when the
--- achievement isn't in the shipped snapshot. The numeric basis for both the
--- formatted line and the achievement-panel row paint — one source so they can't drift.
-function G.RarityValue(achievementId)
+-- The attainment as a raw percent (0–100) under a scope ("region"/default or
+-- "global"), or nil when the achievement isn't in the shipped snapshot. The
+-- numeric basis for the formatted line, the panel-row paint, and the API — one
+-- source so they can't drift.
+function G.RarityValue(achievementId, scope)
     local counts = G.RarityCounts[achievementId]
     if not counts then
         return nil
     end
-    local denom = G.Meta.accounts[G.region]
+    local region = G.ScopeRegion(scope)
+    local denom = G.Meta.accounts[region]
     if not denom or denom == 0 then
         return nil
     end
-    return counts[G.regionIndex] / denom * 100
+    return counts[REGION_INDEX[region]] / denom * 100
 end
 
--- Formatted attainment ("3%", "<1%") for the player's region, or nil when the
--- achievement isn't in the shipped snapshot (newer than the data files).
-function G.RarityFor(achievementId)
-    local pct = G.RarityValue(achievementId)
+-- Formatted attainment ("3%", "<1%") under a scope, or nil when the achievement
+-- isn't in the shipped snapshot (newer than the data files).
+function G.RarityFor(achievementId, scope)
+    local pct = G.RarityValue(achievementId, scope)
     if not pct then
         return nil
     end
     return G.FormatPct(pct)
 end
 
--- Rarity as a WoW item-quality colour, so rarity reads at a glance the way loot
--- does: the rarer the achievement, the higher the quality band. Bands by region
--- attainment — under 1% legendary, under 5% epic, under 15% rare, under 40%
--- uncommon, else common. Achievements outside the rarity snapshot fall back to
--- the brand gold below.
 -- The one brand gold (ffd100): the gratz.gg watermark / attribution colour, and
 -- the fallback tint for rarity outside the snapshot.
 G.GOLD = { 1, 0.82, 0 }
 
-local function QualityForPct(pct)
-    if pct < 1 then return 5 end   -- legendary (orange)
-    if pct < 5 then return 4 end   -- epic (purple)
-    if pct < 15 then return 3 end  -- rare (blue)
-    if pct < 40 then return 2 end  -- uncommon (green)
-    return 1                       -- common (white)
+-- Rarity tiers, rarest first — the loot-quality idiom: the rarer the achievement,
+-- the higher the band. Each carries the attainment % below which it applies and
+-- the ITEM_QUALITY_COLORS index it borrows. Legendary is deliberately tight
+-- (<0.1%, ~1 in 1,000) so orange stays special; junk (grey) is the ubiquitous
+-- tail almost everyone holds. Achievements outside the snapshot get no tier.
+local TIERS = {
+    { name = "legendary", max = 0.1,       quality = 5 }, -- orange
+    { name = "epic",      max = 5,         quality = 4 }, -- purple
+    { name = "rare",      max = 15,        quality = 3 }, -- blue
+    { name = "uncommon",  max = 40,        quality = 2 }, -- green
+    { name = "common",    max = 70,        quality = 1 }, -- white
+    { name = "junk",      max = math.huge, quality = 0 }, -- grey
+}
+G.TIERS = TIERS -- read by the public API's GetTiers
+
+local function TierForPct(pct)
+    for _, t in ipairs(TIERS) do
+        if pct < t.max then
+            return t
+        end
+    end
+    return TIERS[#TIERS]
 end
 
 -- The brand gold as a "rrggbb" hex, derived from G.GOLD so the two can't drift —
@@ -205,20 +240,28 @@ end
 local GOLD_HEX = string.format("%02x%02x%02x",
     math.floor(G.GOLD[1] * 255 + 0.5), math.floor(G.GOLD[2] * 255 + 0.5), math.floor(G.GOLD[3] * 255 + 0.5))
 
--- The pct and the ITEM_QUALITY_COLORS entry for an achievement's rarity tier, or
--- nil when it's outside the shipped snapshot. One place for the band → quality
--- mapping; the three public helpers below just shape its output.
-local function rarityQuality(achievementId)
-    local pct = G.RarityValue(achievementId)
+-- The pct, the tier entry, and its ITEM_QUALITY_COLORS colour for an achievement
+-- under a scope, or nil when it's outside the shipped snapshot. One place for the
+-- band → tier → colour mapping; the helpers below just shape its output.
+local function rarityTier(achievementId, scope)
+    local pct = G.RarityValue(achievementId, scope)
     if not pct then
         return nil
     end
-    return pct, ITEM_QUALITY_COLORS[QualityForPct(pct)]
+    local tier = TierForPct(pct)
+    return pct, tier, ITEM_QUALITY_COLORS[tier.quality]
+end
+
+-- The tier name ("legendary".."junk") for an achievement under a scope, or nil
+-- off-snapshot. Backs the API's GetTier.
+function G.RarityTier(achievementId, scope)
+    local _, tier = rarityTier(achievementId, scope)
+    return tier and tier.name
 end
 
 -- r, g, b (0–1) for an achievement's rarity tier; brand gold when off-snapshot.
-function G.RarityColor(achievementId)
-    local _, c = rarityQuality(achievementId)
+function G.RarityColor(achievementId, scope)
+    local _, _, c = rarityTier(achievementId, scope)
     if not c then
         return G.GOLD[1], G.GOLD[2], G.GOLD[3]
     end
@@ -230,8 +273,8 @@ end
 -- .hex, whose markup form varies by client ("ffRRGGBB" vs "|cffRRGGBB", the latter
 -- leaving stray chars after a fixed sub) — so the inline and SetTextColor paths
 -- stay byte-identical; brand gold when off-snapshot.
-function G.RarityHex(achievementId)
-    local _, c = rarityQuality(achievementId)
+function G.RarityHex(achievementId, scope)
+    local _, _, c = rarityTier(achievementId, scope)
     if not c then
         return GOLD_HEX
     end
@@ -242,8 +285,8 @@ end
 -- One lookup, both outputs a list row needs: the formatted attainment string (or
 -- nil, off-snapshot) and the tier colour r, g, b. Saves calling RarityFor and
 -- RarityColor separately on the same id per row.
-function G.RarityTextAndColor(achievementId)
-    local pct, c = rarityQuality(achievementId)
+function G.RarityTextAndColor(achievementId, scope)
+    local pct, _, c = rarityTier(achievementId, scope)
     if not c then
         return nil, G.GOLD[1], G.GOLD[2], G.GOLD[3]
     end
@@ -258,10 +301,10 @@ end
 -- SelfCompleted (a pcall'd GetAchievementInfo) is only tested when an id's rarity
 -- beats the current best, so the per-id cost is a cheap table lookup and the
 -- completion calls are bounded to genuine improvements, not the whole snapshot.
-function G.RarestEarned()
+function G.RarestEarned(scope)
     local rarestId, rarestVal
     for id in pairs(G.RarityCounts) do
-        local val = G.RarityValue(id)
+        local val = G.RarityValue(id, scope)
         if val and (not rarestVal or val < rarestVal) and G.SelfCompleted(id) then
             rarestVal, rarestId = val, id
         end

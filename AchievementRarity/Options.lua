@@ -7,6 +7,7 @@ local DEFAULTS = {
     enabled = true, -- master switch: off silences every automatic surface (G.IsEnabled)
     toast = true, -- companion toast on ACHIEVEMENT_EARNED (replaces Blizzard's alert)
     screenshot = false, -- auto-screenshot the toast on earn (off: it fills the folder)
+    scope = "region", -- rarity scope: "region" (your own) or "global" (everyone tracked)
 }
 -- Rarity on tooltips, chat lines, and panel rows, plus the toast's glow/sweep
 -- flourish, have no toggle of their own — they're the addon's baseline behaviour,
@@ -80,6 +81,31 @@ local function RegisterSettings()
             "Drag a sample toast to where you want earned toasts to appear, then Lock. Reset returns it to the default spot.",
             true)) -- addSearchTags: required (asserted non-nil); true makes it searchable
     end
+
+    -- Rarity scope: measure against your own region (default) or the whole tracked
+    -- population. A string-valued dropdown; every surface and the public API read
+    -- it through G.Scope(). Guarded so a client build without the dropdown API
+    -- still renders the panel (the saved value, hence the default region, still
+    -- applies). Realm scope is deliberately absent — rarity is only computed per
+    -- region/global, never per realm.
+    local scopeSetting = Settings.RegisterAddOnSetting(
+        category, "ACHRARITY_SCOPE", "scope", AchievementRarityDB,
+        Settings.VarType.String, "Rarity scope", DEFAULTS.scope)
+    if Settings.CreateDropdown then
+        Settings.CreateDropdown(category, scopeSetting, function()
+            local container = Settings.CreateControlTextContainer()
+            container:Add("region", "Your region", "Rarity among accounts in your own region (US or EU).")
+            container:Add("global", "Global", "Rarity among all accounts gratz.gg tracks worldwide.")
+            return container:GetData()
+        end, "Whether rarity is measured against your own region or the whole tracked population. Applies everywhere — tooltips, panel rows, chat, and the toast.")
+    end
+    -- Repaint the visible panel rows the moment scope flips, so their %/colours
+    -- update without waiting for the list to re-fill.
+    Settings.SetOnValueChangedCallback("ACHRARITY_SCOPE", function()
+        if G.RepaintRows then
+            G.RepaintRows()
+        end
+    end)
 
     -- What the percentages mean + the data snapshot's as-of date: a release IS a
     -- data refresh. The denominator shown is the player's own — the same one

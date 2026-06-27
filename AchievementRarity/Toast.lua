@@ -250,9 +250,11 @@ local queue = {}
 -- gold. Common tiers keep the percentage and the off-snapshot fallback its grey
 -- note — both carry no tilde, so the prefix holds the whole line and the other two
 -- are empty.
--- "EU players" / "accounts worldwide" — the region-scoped noun the rarity line ends on.
+-- "EU players" / "accounts worldwide" — the scope-region noun the rarity line
+-- ends on. Follows the user's chosen scope (region/global) like every figure here.
 local function scopeFor(noun)
-    return G.region == "global" and (noun .. " worldwide") or (G.region:upper() .. " " .. noun)
+    local region = G.ScopeRegion()
+    return region == "global" and (noun .. " worldwide") or (region:upper() .. " " .. noun)
 end
 
 local function RarityText(achievementId)
@@ -262,7 +264,7 @@ local function RarityText(achievementId)
     end
     local hex = G.RarityHex(achievementId)
     if pct < COUNT_BELOW_PCT then
-        local n = BreakUpLargeNumbers(G.RarityCounts[achievementId][G.regionIndex])
+        local n = BreakUpLargeNumbers(G.RarityCounts[achievementId][G.ScopeIndex()])
         return "|cffffd100One of only |r",
             string.format("|cff%s~|r", hex),
             string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, scopeFor("players"))

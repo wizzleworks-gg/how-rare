@@ -12,6 +12,7 @@
 Data\Meta.lua
 Data\Rarity.lua
 Core.lua
+Api.lua
 Options.lua
 Tooltip.lua
 Toast.lua
