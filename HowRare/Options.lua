@@ -178,7 +178,7 @@ end
 BINDING_NAME_HOWRARE_SHARERAREST = "Share rarest achievement"
 
 SLASH_HOWRARE1 = "/howrare"
-SLASH_HOWRARE2 = "/hw"
+SLASH_HOWRARE2 = "/hr"
 SlashCmdList.HOWRARE = function(msg)
     local cmd, rest = (msg and strtrim(msg) or ""):match("^(%S*)%s*(.*)$")
     cmd = cmd:lower()

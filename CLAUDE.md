@@ -32,7 +32,7 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
   - `Toast.lua` — the earned toast (replaces Blizzard's alert while on) + the
     share/showcase paths.
   - `Options.lua` — SavedVariables defaults, the Settings panel, the `/howrare`
-    (`/hw`) slash, the addon-compartment entry.
+    (`/hr`) slash, the addon-compartment entry.
   - `Bindings.xml` — the "Share rarest achievement" keybind. Auto-loaded from the
     addon root by the client; **must not** be listed in the TOC.
 - `scripts/export-addon-data.py` — regenerates `Data/` from the gratz.gg DB
@@ -43,7 +43,7 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
 
 - SavedVariables table: `HowRareDB`. Global debug handle:
   `HowRare` (e.g. `/dump HowRare.RarityCounts`).
-- Slash: `/howrare` and `/hw` (`status`, `toast [n|pin]`, `share`, `debug`; bare
+- Slash: `/howrare` and `/hr` (`status`, `toast [n|pin]`, `share`, `debug`; bare
   opens options).
 - **Naming: brand headline "How Rare?", descriptive subtitle for discovery,
   gratz.gg as data attribution.** The CurseForge/TOC title is **"How Rare? —
