@@ -313,7 +313,7 @@ local function Populate(f, achievementId)
     f.rarityPost:SetText(post)
     -- Two clearly-separated dates: when you earned it (the client's real
     -- completion date — today for a live earn, the true past date for a re-share
-    -- from the panel) and that the rarity figure is the current snapshot's, not
+    -- via /rarity share) and that the rarity figure is the current snapshot's, not
     -- the rarity back when you earned it. The earn date is dropped when unknown
     -- (e.g. an unearned preview), leaving just the rarity's as-of.
     local earned = G.AchievementEarnedShort(achievementId)
@@ -376,7 +376,7 @@ end
 
 -- Fill every free slot from the queue, skipping ids unknown to this client. Each
 -- queue entry is { id, capture } — capture toasts (a real earn with the option
--- on, or a panel share) snap a screenshot once shown.
+-- on, or a /rarity share) snap a screenshot once shown.
 function PumpQueue()
     for _, f in ipairs(frames) do
         while not f:IsShown() and #queue > 0 do

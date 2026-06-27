@@ -29,12 +29,11 @@ end
 -- shipped rarity ids come from the web API, which can run ahead of the client); a
 -- stray id must degrade at the call site, never error. Nil name = unknown.
 function G.AchievementInfo(id)
-    local ok, _, name, points, completed, _, _, _, _, _, icon, _, _, wasEarnedByMe =
-        pcall(GetAchievementInfo, id)
+    local ok, _, name, points, completed, _, _, _, _, _, icon = pcall(GetAchievementInfo, id)
     if not ok then
         return nil
     end
-    return name, points, completed, icon, wasEarnedByMe
+    return name, points, completed, icon
 end
 
 -- Whether the player has completed an achievement (account-wide flag). The
@@ -161,7 +160,7 @@ end
 
 -- The player's region attainment as a raw percent (0–100), or nil when the
 -- achievement isn't in the shipped snapshot. The numeric basis for both the
--- formatted line and the panel's rarity sort — one source so they can't drift.
+-- formatted line and the achievement-panel row paint — one source so they can't drift.
 function G.RarityValue(achievementId)
     local counts = G.RarityCounts[achievementId]
     if not counts then
