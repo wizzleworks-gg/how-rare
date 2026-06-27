@@ -25,9 +25,9 @@ jobs:
           set -euo pipefail
           if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
             V="${GITHUB_REF_NAME#v}"
-            sed -i "s/^## Version:.*/## Version: ${V}/" AchievementRarity/AchievementRarity.toc
+            sed -i "s/^## Version:.*/## Version: ${V}/" HowRare/HowRare.toc
           else
-            V="$(grep -m1 '^## Version:' AchievementRarity/AchievementRarity.toc | awk '{print $3}')"
+            V="$(grep -m1 '^## Version:' HowRare/HowRare.toc | awk '{print $3}')"
           fi
           echo "version=${V}" >> "$GITHUB_OUTPUT"
           echo "Release version: ${V}"
@@ -57,7 +57,7 @@ jobs:
           ZIP="${{ steps.zip.outputs.zip }}"
           # Map each TOC interface number (e.g. 120005 -> "12.0.5") to a
           # CurseForge game-version id from its versions endpoint.
-          ifaces="$(grep -m1 '^## Interface:' AchievementRarity/AchievementRarity.toc | sed 's/^## Interface://' | tr ',' ' ')"
+          ifaces="$(grep -m1 '^## Interface:' HowRare/HowRare.toc | sed 's/^## Interface://' | tr ',' ' ')"
           versions_json="$(curl -sf -H "X-Api-Token: ${CF_API_KEY}" https://wow.curseforge.com/api/game/versions)"
           ids='[]'
           for n in $ifaces; do

@@ -1,5 +1,5 @@
 -- Options.lua — SavedVariables defaults + the Settings panel (one checkbox per
--- feature) + /rarity slash. AchievementRarityDB holds the feature toggles and the
+-- feature) + /howrare slash. HowRareDB holds the feature toggles and the
 -- saved toast position.
 local addonName, G = ...
 
@@ -14,21 +14,21 @@ local DEFAULTS = {
 -- governed by the master switch above.
 
 local function ApplyDefaults()
-    AchievementRarityDB = AchievementRarityDB or {}
+    HowRareDB = HowRareDB or {}
     for key, value in pairs(DEFAULTS) do
-        if AchievementRarityDB[key] == nil then
-            AchievementRarityDB[key] = value
+        if HowRareDB[key] == nil then
+            HowRareDB[key] = value
         end
     end
 end
 
 local function RegisterSettings()
-    local category, layout = Settings.RegisterVerticalLayoutCategory("Achievement Rarity")
+    local category, layout = Settings.RegisterVerticalLayoutCategory("How Rare?")
     G.settingsCategory = category
 
     local function AddCheckbox(key, label, tooltip)
         local setting = Settings.RegisterAddOnSetting(
-            category, "ACHRARITY_" .. key:upper(), key, AchievementRarityDB,
+            category, "HOWRARE_" .. key:upper(), key, HowRareDB,
             Settings.VarType.Boolean, label, DEFAULTS[key])
         return setting, Settings.CreateCheckbox(category, setting, tooltip)
     end
@@ -44,15 +44,15 @@ local function RegisterSettings()
 
     -- Master switch. Off silences every automatic surface — tooltip / chat /
     -- panel rarity and the toast; the sub-toggles below grey out under it.
-    local master, masterInit = AddCheckbox("enabled", "Achievement Rarity enabled",
-        "Master switch for Achievement Rarity. Off silences every automatic surface — rarity on tooltips, chat and panel rows, and the earned toast. On by default.")
+    local master, masterInit = AddCheckbox("enabled", "How Rare? enabled",
+        "Master switch for How Rare?. Off silences every automatic surface — rarity on tooltips, chat and panel rows, and the earned toast. On by default.")
     local function MasterOn()
         return master:GetValue()
     end
     -- Re-apply each automatic surface the moment the master flips: suppress or
     -- restore Blizzard's alert. Tooltip / chat / panel rarity read the master at
     -- use-time, so need no callback.
-    Settings.SetOnValueChangedCallback("ACHRARITY_ENABLED", function()
+    Settings.SetOnValueChangedCallback("HOWRARE_ENABLED", function()
         G.ApplyToastMode()
     end)
 
@@ -60,7 +60,7 @@ local function RegisterSettings()
         "Replace Blizzard's achievement alert with a toast that adds the achievement's rarity. Turn off to restore Blizzard's own alert.")
     DependOn(toastInit, masterInit, MasterOn)
     -- Suppress / restore Blizzard's own achievement alert the moment this flips.
-    Settings.SetOnValueChangedCallback("ACHRARITY_TOAST", function()
+    Settings.SetOnValueChangedCallback("HOWRARE_TOAST", function()
         G.ApplyToastMode()
     end)
 
@@ -89,7 +89,7 @@ local function RegisterSettings()
     -- applies). Realm scope is deliberately absent — rarity is only computed per
     -- region/global, never per realm.
     local scopeSetting = Settings.RegisterAddOnSetting(
-        category, "ACHRARITY_SCOPE", "scope", AchievementRarityDB,
+        category, "HOWRARE_SCOPE", "scope", HowRareDB,
         Settings.VarType.String, "Rarity scope", DEFAULTS.scope)
     if Settings.CreateDropdown then
         Settings.CreateDropdown(category, scopeSetting, function()
@@ -101,7 +101,7 @@ local function RegisterSettings()
     end
     -- Repaint the visible panel rows the moment scope flips, so their %/colours
     -- update without waiting for the list to re-fill.
-    Settings.SetOnValueChangedCallback("ACHRARITY_SCOPE", function()
+    Settings.SetOnValueChangedCallback("HOWRARE_SCOPE", function()
         if G.RepaintRows then
             G.RepaintRows()
         end
@@ -132,7 +132,7 @@ loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", function(self, event, loadedName)
     if event == "PLAYER_LOGIN" then
-        print(string.format("|cffffd100Achievement Rarity|r loaded (as of %s) — /rarity for options · %s",
+        print(string.format("|cffffd100How Rare?|r loaded (as of %s) — /howrare for options · %s",
             G.AsOfLong(), G.BRAND))
         return
     end
@@ -154,13 +154,13 @@ local function PrintStatus()
         rarityCount = rarityCount + 1
     end
     local opts = {}
-    for key, value in pairs(AchievementRarityDB) do
+    for key, value in pairs(HowRareDB) do
         if type(value) == "boolean" then
             opts[#opts + 1] = key .. "=" .. (value and "on" or "off")
         end
     end
     table.sort(opts)
-    print("|cffffd100Achievement Rarity|r status")
+    print("|cffffd100How Rare?|r status")
     print("  version " .. C_AddOns.GetAddOnMetadata(addonName, "Version")
         .. " · region " .. G.region .. " · data as of " .. G.Meta.asOf)
     print("  rarity entries " .. rarityCount
@@ -175,11 +175,11 @@ end
 -- listed in the .toc (the general XML loader would otherwise mis-parse it and warn
 -- on every <Binding> attribute). Ships unbound; the user assigns a key. No
 -- category, so it lands under the default AddOns grouping.
-BINDING_NAME_ACHIEVEMENTRARITY_SHARERAREST = "Share rarest achievement"
+BINDING_NAME_HOWRARE_SHARERAREST = "Share rarest achievement"
 
-SLASH_ACHIEVEMENTRARITY1 = "/rarity"
-SLASH_ACHIEVEMENTRARITY2 = "/ar"
-SlashCmdList.ACHIEVEMENTRARITY = function(msg)
+SLASH_HOWRARE1 = "/howrare"
+SLASH_HOWRARE2 = "/hw"
+SlashCmdList.HOWRARE = function(msg)
     local cmd, rest = (msg and strtrim(msg) or ""):match("^(%S*)%s*(.*)$")
     cmd = cmd:lower()
     if cmd == "status" then
@@ -189,16 +189,16 @@ SlashCmdList.ACHIEVEMENTRARITY = function(msg)
     elseif cmd == "share" then
         G.ShareRarest()
     elseif cmd == "debug" then
-        AchievementRarityDB.debug = not AchievementRarityDB.debug
-        print("|cffffd100Achievement Rarity|r debug " .. (AchievementRarityDB.debug and "ON" or "off"))
+        HowRareDB.debug = not HowRareDB.debug
+        print("|cffffd100How Rare?|r debug " .. (HowRareDB.debug and "ON" or "off"))
     else
-        -- Bare /rarity (or "options") opens the settings page — there's no window.
+        -- Bare /howrare (or "options") opens the settings page — there's no window.
         OpenOptions()
     end
 end
 
 -- The addon-compartment entry (puzzle-piece drop-down at the minimap);
 -- declared in the TOC via AddonCompartmentFunc. Opens the options page.
-function AchievementRarity_OnAddonCompartmentClick()
+function HowRare_OnAddonCompartmentClick()
     OpenOptions()
 end

@@ -1,11 +1,11 @@
 -- Api.lua — the public, read-only, versioned API other addons build on. Thin
 -- wrappers over the same internals our own surfaces use, so the API and the addon
--- can never disagree. Consumers gate on `if AchievementRarityAPI then ... end` and
+-- can never disagree. Consumers gate on `if HowRareAPI then ... end` and
 -- may check `.version`. All getters take an optional `scope`: "region" (the
 -- player's home region, the user's default) or "global". Rarity data by gratz.gg.
 local _, G = ...
 
-AchievementRarityAPI = {
+HowRareAPI = {
     -- Bump on breaking changes; additive changes keep the version. Consumers
     -- gate on `>= n`.
     version = 1,
@@ -13,7 +13,7 @@ AchievementRarityAPI = {
     source = "gratz.gg",
 }
 
-local API = AchievementRarityAPI
+local API = HowRareAPI
 
 -- Region attainment as a percent (0–100), or nil if the achievement isn't in the
 -- shipped snapshot (newer than this release).
@@ -80,3 +80,9 @@ function API:GetTiers()
     end
     return out
 end
+
+-- Casing forgiveness: `HowRareAPI` is canonical (matches the achievementID
+-- argument casing), but integrators reach for `Api` by reflex — alias it so a
+-- mistyped global resolves to the same table instead of a silent nil.
+HowRareApi = HowRareAPI
+

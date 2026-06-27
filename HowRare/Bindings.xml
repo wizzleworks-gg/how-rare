@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="HOWRARE_SHARERAREST">
+        HowRare.ShareRarest()
+    </Binding>
+</Bindings>

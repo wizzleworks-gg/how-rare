@@ -1,4 +1,4 @@
-# Achievement Rarity
+# How Rare?
 
 A World of Warcraft companion addon that shows **how rare each achievement is** —
 the share of accounts that have earned it — right where you see achievements in
@@ -7,9 +7,9 @@ snapshot.
 
 ## Features
 
-One master switch (**Achievement Rarity enabled**) governs every automatic
+One master switch (**How Rare? enabled**) governs every automatic
 surface; the toast and its screenshot have their own toggles beneath it. Open the
-options with `/rarity` or Settings → AddOns → Achievement Rarity.
+options with `/howrare` or Settings → AddOns → How Rare?.
 
 - **Rarity everywhere** — every achievement tooltip, incoming guild/nearby chat
   announcement, and Blizzard achievement-panel row gets its rarity:
@@ -18,7 +18,7 @@ options with `/rarity` or Settings → AddOns → Achievement Rarity.
   glance while scrolling.
 - **Earned toast** — a companion toast on achievement earn carrying the rarity,
   styled to be screenshotted; it replaces Blizzard's own alert while on (optional
-  auto-screenshot on earn). `/rarity share` (or the "Share rarest achievement"
+  auto-screenshot on earn). `/howrare share` (or the "Share rarest achievement"
   keybind) re-pops your rarest earned achievement as a shareable card.
 
 ## Privacy
@@ -38,13 +38,13 @@ baked in, as a periodic snapshot from gratz.gg. Each figure carries its own
 Symlink the addon into your WoW install and `/reload` after edits:
 
 ```sh
-ln -s "$(pwd)/AchievementRarity" \
-  "/Applications/World of Warcraft/_retail_/Interface/AddOns/AchievementRarity"
+ln -s "$(pwd)/HowRare" \
+  "/Applications/World of Warcraft/_retail_/Interface/AddOns/HowRare"
 ```
 
 ### Refreshing the shipped data
 
-The numbers in `AchievementRarity/Data/` are a snapshot pulled from the gratz.gg
+The numbers in `HowRare/Data/` are a snapshot pulled from the gratz.gg
 database (`scripts/export-addon-data.py`, dev/CI only — never shipped in the zip).
 Refresh them before a release:
 
@@ -56,7 +56,7 @@ ssh -N -L 15432:localhost:5432 root@<prod-host> &
     --database-url postgresql://gratz:gratz@localhost:15432/gratz
 ```
 
-Commit the regenerated `AchievementRarity/Data/*.lua`.
+Commit the regenerated `HowRare/Data/*.lua`.
 
 ### Releasing
 

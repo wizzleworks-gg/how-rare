@@ -11,7 +11,7 @@ local _, G = ...
 -- when first created.
 local function PaintRarity(button)
     local rarity, rr, rg, rb = G.RarityTextAndColor(button.id)
-    if not button.AchRarityText then
+    if not button.HowRareText then
         if not rarity then
             return
         end
@@ -19,12 +19,12 @@ local function PaintRarity(button)
         -- Centred in the ~15px band between the icon's bottom edge and the
         -- row's bottom (84px row, icon ends at 69).
         fs:SetPoint("TOP", button.Icon, "BOTTOM", 0, 1)
-        button.AchRarityText = fs
+        button.HowRareText = fs
     end
     if rarity then
-        button.AchRarityText:SetTextColor(rr, rg, rb)
+        button.HowRareText:SetTextColor(rr, rg, rb)
     end
-    button.AchRarityText:SetText((G.IsEnabled() and rarity) or "")
+    button.HowRareText:SetText((G.IsEnabled() and rarity) or "")
 end
 
 local function OnRowEnter(_, button, achievementId)
@@ -39,12 +39,12 @@ local function OnRowEnter(_, button, achievementId)
     GameTooltip:SetPoint("BOTTOMLEFT", button, "TOPLEFT", 0, 2)
     GameTooltip:AddLine(G.RarityLine(rarity), rr, rg, rb)
     GameTooltip:Show()
-    button.AchRarityTipShown = true
+    button.HowRareTipShown = true
 end
 
 local function OnRowLeave(_, button)
-    if button.AchRarityTipShown then
-        button.AchRarityTipShown = nil
+    if button.HowRareTipShown then
+        button.HowRareTipShown = nil
         GameTooltip:Hide()
     end
 end

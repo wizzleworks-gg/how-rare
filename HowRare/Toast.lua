@@ -46,7 +46,7 @@ local LINE_GAP = 5
 local TILDE_NUDGE = 4
 local GAP = 16
 -- Default toast spot when the player hasn't moved it (the mover overrides it via
--- AchievementRarityDB.toastPos): top-left of the screen, inset from the corner.
+-- HowRareDB.toastPos): top-left of the screen, inset from the corner.
 -- These three values are the whole default, so they're easy to tune.
 local DEFAULT_POINT = "TOPLEFT"
 local DEFAULT_X, DEFAULT_Y = 16, -200
@@ -87,7 +87,7 @@ local PumpQueue -- forward declaration (the release closure calls it before it's
 -- footer row (earn time · provenance) + the fade timer + the optional glow/sweep.
 -- The fader finishing (or a click) frees the slot and pumps the next queued id in.
 local function CreateToastFrame(index)
-    local f = CreateFrame("Button", "AchievementRarityToast" .. index, UIParent, "BackdropTemplate")
+    local f = CreateFrame("Button", "HowRareToast" .. index, UIParent, "BackdropTemplate")
     f:SetSize(TOAST_W, TOAST_H)
     f:SetFrameStrata("HIGH")
     f:SetBackdrop({
@@ -315,7 +315,7 @@ local function Populate(f, achievementId)
     f.rarityPost:SetText(post)
     -- Two clearly-separated dates: when you earned it (the client's real
     -- completion date — today for a live earn, the true past date for a re-share
-    -- via /rarity share) and that the rarity figure is the current snapshot's, not
+    -- via /howrare share) and that the rarity figure is the current snapshot's, not
     -- the rarity back when you earned it. The earn date is dropped when unknown
     -- (e.g. an unearned preview), leaving just the rarity's as-of.
     local earned = G.AchievementEarnedShort(achievementId)
@@ -325,10 +325,10 @@ local function Populate(f, achievementId)
 end
 
 -- The base anchor every toast hangs off: the player's saved spot (the mover writes
--- AchievementRarityDB.toastPos in the shared SavePoint shape) or, when unset, the
+-- HowRareDB.toastPos in the shared SavePoint shape) or, when unset, the
 -- default spot (DEFAULT_POINT/X/Y above). Returns point, relPoint, x, y.
 local function ToastAnchor()
-    local pos = AchievementRarityDB and AchievementRarityDB.toastPos
+    local pos = HowRareDB and HowRareDB.toastPos
     if pos then
         return pos.point, pos.relPoint, pos.x, pos.y
     end
@@ -371,14 +371,14 @@ local function CaptureSoon(name)
         shotPending = false
         Screenshot()
         C_Timer.After(0.3, function()
-            print(string.format("|cffffd100Achievement Rarity|r screenshot saved%s", name and (": " .. name) or ""))
+            print(string.format("|cffffd100How Rare?|r screenshot saved%s", name and (": " .. name) or ""))
         end)
     end)
 end
 
 -- Fill every free slot from the queue, skipping ids unknown to this client. Each
 -- queue entry is { id, capture } — capture toasts (a real earn with the option
--- on, or a /rarity share) snap a screenshot once shown.
+-- on, or a /howrare share) snap a screenshot once shown.
 function PumpQueue()
     for _, f in ipairs(frames) do
         while not f:IsShown() and #queue > 0 do
@@ -399,8 +399,8 @@ function PumpQueue()
 end
 
 -- Enqueue an achievement for a toast. Kept as G.ShowToast so the real-earn handler
--- and /rarity toast both feed the queue through one path, and the documented
--- /run AchievementRarity.ShowToast(id) preview still works (one id → one toast).
+-- and /howrare toast both feed the queue through one path, and the documented
+-- /run HowRare.ShowToast(id) preview still works (one id → one toast).
 -- capture (optional) snaps a screenshot once the toast shows — set by a real earn
 -- when the screenshot option is on, and by the share action.
 local function ShowToast(achievementId, capture)
@@ -499,14 +499,14 @@ local function ToastButton(parent, side, width, text, onClick)
     return b
 end
 
--- Debug: /rarity toast pin — show one toast that does NOT fade, with Replay/Close
+-- Debug: /howrare toast pin — show one toast that does NOT fade, with Replay/Close
 -- buttons beneath it, so the card can be studied or screenshotted at leisure. Uses
 -- the rarest achievement whose name fits, so the pinned toast reads as an
 -- impressive, well-fitting earn. Holds slot 1 until you Close it.
 local function DebugPin()
     local f = ShowSample(ShowcaseId())
     if not f then
-        print("|cffffd100Achievement Rarity|r toast pin: no client-known achievement.")
+        print("|cffffd100How Rare?|r toast pin: no client-known achievement.")
         return
     end
 
@@ -522,13 +522,13 @@ local function DebugPin()
     f.pinReplay:Show()
     f.pinClose:Show()
     f.PlayEffects()
-    print("|cffffd100Achievement Rarity|r toast pinned — Replay effect / Close beneath it.")
+    print("|cffffd100How Rare?|r toast pinned — Replay effect / Close beneath it.")
 end
 
 -- Move mode (the options "Move toast" button): a draggable sample toast so the
 -- player can place where earned toasts appear. Closes the settings panel so the
 -- sample is visible, drops a real-rarity sample, and lets you drag it; the spot
--- persists to AchievementRarityDB.toastPos (the same SavePoint shape) and every
+-- persists to HowRareDB.toastPos (the same SavePoint shape) and every
 -- real toast then anchors there (Layout → ToastAnchor). Lock ends the mode and
 -- tears the dragging back down, so real toasts are never draggable; Reset clears
 -- the saved spot back to the default.
@@ -538,7 +538,7 @@ function G.ToastMoveMode()
     end
     local f = ShowSample(DebugIds()[1])
     if not f then
-        print("|cffffd100Achievement Rarity|r move toast: no client-known achievement to show.")
+        print("|cffffd100How Rare?|r move toast: no client-known achievement to show.")
         return
     end
 
@@ -556,22 +556,22 @@ function G.ToastMoveMode()
             f.moveReset:Hide()
             f:Hide()
             Layout()
-            print("|cffffd100Achievement Rarity|r toast position saved.")
+            print("|cffffd100How Rare?|r toast position saved.")
         end)
         f.moveReset = ToastButton(f, "RIGHT", 110, "Reset position", function()
-            AchievementRarityDB.toastPos = nil
+            HowRareDB.toastPos = nil
             Layout() -- back to the default spot; the sample follows
         end)
     end
     f.moveLock:Show()
     f.moveReset:Show()
-    print("|cffffd100Achievement Rarity|r drag the toast to place it, then Lock. Reset returns it to default.")
+    print("|cffffd100How Rare?|r drag the toast to place it, then Lock. Reset returns it to default.")
 end
 
--- Debug: /rarity toast [count] — fire `count` (default 1) toasts, mirroring a
+-- Debug: /howrare toast [count] — fire `count` (default 1) toasts, mirroring a
 -- real earn now that we replace Blizzard's alert. Uses the rarest distinct
 -- client-known ids (count-form first) so the rarity lines are real and show the
--- "one of only ~N" count. /rarity toast pin pins one that doesn't fade, for
+-- "one of only ~N" count. /howrare toast pin pins one that doesn't fade, for
 -- studying the layout.
 local function DebugToast(rest)
     rest = rest and strtrim(rest):lower() or ""
@@ -592,26 +592,26 @@ local function DebugToast(rest)
     end
 
     if #ids == 0 then
-        print("|cffffd100Achievement Rarity|r debug toast: no client-known achievement to show.")
+        print("|cffffd100How Rare?|r debug toast: no client-known achievement to show.")
         return
     end
 
     for _, id in ipairs(ids) do
         ShowToast(id)
     end
-    print(string.format("|cffffd100Achievement Rarity|r debug toast: fired %d.", #ids))
+    print(string.format("|cffffd100How Rare?|r debug toast: fired %d.", #ids))
 end
 
 G.DebugToast = DebugToast
 
 -- Share your rarest earned achievement: re-pop that card and let the capture path
--- screenshot it. Both the /rarity share command and the "Share rarest achievement"
+-- screenshot it. Both the /howrare share command and the "Share rarest achievement"
 -- keybind call this. Prints a note if none of your earned achievements are in the
 -- snapshot yet.
 function G.ShareRarest()
     local _, _, id = G.RarestEarned()
     if not id then
-        print("|cffffd100Achievement Rarity|r nothing to share yet — none of your earned achievements are in this data snapshot.")
+        print("|cffffd100How Rare?|r nothing to share yet — none of your earned achievements are in this data snapshot.")
         return
     end
     ShowToast(id, true)
@@ -625,7 +625,7 @@ function G.ApplyToastMode()
     if not AlertFrame then
         return
     end
-    if G.IsEnabled() and AchievementRarityDB.toast then
+    if G.IsEnabled() and HowRareDB.toast then
         AlertFrame:UnregisterEvent("ACHIEVEMENT_EARNED")
     else
         AlertFrame:RegisterEvent("ACHIEVEMENT_EARNED")
@@ -643,8 +643,8 @@ events:SetScript("OnEvent", function(_, event, achievementId)
         G.ApplyToastMode()
         return
     end
-    if not G.IsEnabled() or not AchievementRarityDB.toast then
+    if not G.IsEnabled() or not HowRareDB.toast then
         return
     end
-    ShowToast(achievementId, AchievementRarityDB.screenshot)
+    ShowToast(achievementId, HowRareDB.screenshot)
 end)

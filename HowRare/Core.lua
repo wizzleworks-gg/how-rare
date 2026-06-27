@@ -3,7 +3,7 @@
 -- same numbers, same formatting, both sides.
 local _, G = ...
 
-AchievementRarity = G -- global handle for /dump debugging
+HowRare = G -- global handle for /dump debugging
 
 -- The player's home region: own region for US/EU, global for everyone else
 -- (kr/tw/cn) — mirrors the site's standingRegionFor. This is the "region" scope's
@@ -20,7 +20,7 @@ local REGION_INDEX = { us = 1, eu = 2, global = 3 }
 -- G.Scope(), and the API also accepts a per-call override. Defensive against a
 -- not-yet-loaded saved-vars table (treated as the region default until loaded).
 function G.Scope()
-    return (AchievementRarityDB and AchievementRarityDB.scope == "global") and "global" or "region"
+    return (HowRareDB and HowRareDB.scope == "global") and "global" or "region"
 end
 
 -- The data region a scope reads: "global" → global; "region"/default → home.
@@ -38,13 +38,13 @@ end
 
 G.BRAND = "gratz.gg"
 
--- The addon-wide master switch (the "Achievement Rarity enabled" option). Off
+-- The addon-wide master switch (the "How Rare? enabled" option). Off
 -- silences every automatic surface — tooltip / chat / panel rarity and the earned
 -- toast. Defensive against a not-yet-loaded saved-vars table (treated as off until
 -- ADDON_LOADED applies the default), mirroring the per-feature gates. Default on
 -- once loaded.
 function G.IsEnabled()
-    return AchievementRarityDB ~= nil and AchievementRarityDB.enabled ~= false
+    return HowRareDB ~= nil and HowRareDB.enabled ~= false
 end
 
 -- pcall: GetAchievementInfo hard-errors on ids unknown to this client build (the
@@ -65,12 +65,12 @@ function G.SelfCompleted(id)
     return completed
 end
 
--- Verbose diagnostics, persisted via /rarity debug. Cheap when off; callers pay
+-- Verbose diagnostics, persisted via /howrare debug. Cheap when off; callers pay
 -- only the call. Errors are NOT routed here — enable them with
 -- /console scriptErrors 1 (or BugSack).
 function G.Debug(...)
-    if AchievementRarityDB and AchievementRarityDB.debug then
-        print("|cffff7700Achievement Rarity dbg:|r", ...)
+    if HowRareDB and HowRareDB.debug then
+        print("|cffff7700How Rare? dbg:|r", ...)
     end
 end
 
@@ -147,10 +147,13 @@ function G.AchievementEarnedShort(id)
 end
 
 -- The standard attributed rarity line — every tooltip surface renders this
--- exact string, so the wording can't drift between them.
+-- exact string, so the wording can't drift between them. The addon's name is the
+-- question and the % is its answer ("How Rare? 3%"), with gratz.gg the source.
+-- The "of active accounts" qualifier and the snapshot date live on the options
+-- page, not on every hover. Colour treatment (muted question, tier-coloured %,
+-- dim source) is tuned at the call sites in-game; this is just the text.
 function G.RarityLine(rarity)
-    return string.format("Rarity: %s of active accounts — %s (%s)",
-        rarity, G.BRAND, G.AsOfLong())
+    return string.format("How Rare? %s · %s", rarity, G.BRAND)
 end
 
 -- Run a callback once Blizzard_AchievementUI is available. It's
@@ -317,14 +320,14 @@ function G.RarestEarned(scope)
 end
 
 -- Movable-frame position persistence — one saved shape ({point, relPoint,
--- x, y} in AchievementRarityDB[key]) for every draggable frame (today: the toast).
+-- x, y} in HowRareDB[key]) for every draggable frame (today: the toast).
 function G.SavePoint(frame, key)
     local point, _, relPoint, x, y = frame:GetPoint()
-    AchievementRarityDB[key] = { point = point, relPoint = relPoint, x = x, y = y }
+    HowRareDB[key] = { point = point, relPoint = relPoint, x = x, y = y }
 end
 
 -- Make `frame` drag-to-move (left button) and persist its point under
--- AchievementRarityDB[key] in the SavePoint shape. Clamped to screen so a frame
+-- HowRareDB[key] in the SavePoint shape. Clamped to screen so a frame
 -- can't be dragged off an edge and lost. The `dragging` flag it sets lets a frame
 -- that is also clickable tell a drag-release from a click in its own handler.
 function G.MakeDraggable(frame, key)

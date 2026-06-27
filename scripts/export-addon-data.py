@@ -3,7 +3,7 @@
 
 Reads the same tables the gratz.gg site reads — public.achievement_rarity +
 public.rarity_meta (the rarity counter's output) — so the addon cannot disagree
-with the site. Emits into AchievementRarity/Data/:
+with the site. Emits into HowRare/Data/:
 
   Rarity.lua  — achievement_id -> {us, eu, global} account counts, packed
   Meta.lua    — as-of date + per-region active-account denominators
@@ -24,7 +24,7 @@ from pathlib import Path
 import psycopg
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_OUT = REPO_ROOT / "AchievementRarity" / "Data"
+DEFAULT_OUT = REPO_ROOT / "HowRare" / "Data"
 DEFAULT_DB = "postgresql://gratz:gratz@localhost:5432/gratz"
 
 REGIONS = ("us", "eu", "global")  # index order of the packed Lua triples
