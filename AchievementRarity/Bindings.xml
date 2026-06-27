@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="ACHIEVEMENTRARITY_SHARERAREST">
+        AchievementRarity.ShareRarest()
+    </Binding>
+</Bindings>

@@ -1,0 +1,94 @@
+name: Release
+
+# Deliberate release trigger only — pushing a version tag (v1.2.3) or the manual
+# "Run workflow" button. Plain pushes to a branch do NOT release; refresh the
+# Data/ snapshot and commit it before tagging (see README "Releasing").
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Tag drives the version: stamp it into the TOC so the zip and the in-game
+      # version match the tag. Manual dispatch (no tag) uses the TOC's own value.
+      - name: Determine version
+        id: ver
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+            sed -i "s/^## Version:.*/## Version: ${V}/" AchievementRarity/AchievementRarity.toc
+          else
+            V="$(grep -m1 '^## Version:' AchievementRarity/AchievementRarity.toc | awk '{print $3}')"
+          fi
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+          echo "Release version: ${V}"
+
+      - name: Build zip
+        id: zip
+        run: |
+          set -euo pipefail
+          OUT="$(scripts/release.sh)"
+          echo "zip=${OUT}" >> "$GITHUB_OUTPUT"
+          echo "Built ${OUT}"
+
+      # Upload to CurseForge via its Upload API. Inert until both are configured,
+      # so the scaffold can land before the CurseForge project exists:
+      #   - secret  CF_API_KEY     (a CurseForge API token)
+      #   - variable CF_PROJECT_ID (the numeric project id, public)
+      - name: Upload to CurseForge
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CF_API_KEY:-}" ] || [ -z "${CF_PROJECT_ID:-}" ]; then
+            echo "CF_API_KEY secret or CF_PROJECT_ID variable not set — built ${{ steps.zip.outputs.zip }} but skipping upload."
+            exit 0
+          fi
+          ZIP="${{ steps.zip.outputs.zip }}"
+          # Map each TOC interface number (e.g. 120005 -> "12.0.5") to a
+          # CurseForge game-version id from its versions endpoint.
+          ifaces="$(grep -m1 '^## Interface:' AchievementRarity/AchievementRarity.toc | sed 's/^## Interface://' | tr ',' ' ')"
+          versions_json="$(curl -sf -H "X-Api-Token: ${CF_API_KEY}" https://wow.curseforge.com/api/game/versions)"
+          ids='[]'
+          for n in $ifaces; do
+            n="$(echo "$n" | tr -cd '0-9')"
+            [ -n "$n" ] || continue
+            name="$((10#${n:0:2})).$((10#${n:2:2})).$((10#${n:4:2}))"
+            id="$(echo "$versions_json" | jq -r --arg n "$name" 'map(select(.name==$n)) | .[0].id // empty')"
+            if [ -n "$id" ]; then
+              ids="$(echo "$ids" | jq --argjson id "$id" '. + [$id]')"
+            else
+              echo "warning: no CurseForge game version found for ${name}"
+            fi
+          done
+          if [ "$(echo "$ids" | jq 'length')" -eq 0 ]; then
+            echo "error: no CurseForge game versions resolved from ## Interface" >&2
+            exit 1
+          fi
+          # Changelog = this version's CHANGELOG.md section (the block under its
+          # "## <version>" heading, up to the next heading), with leading blank lines
+          # trimmed. Falls back to "Release <version>" if no matching section exists.
+          V="${{ steps.ver.outputs.version }}"
+          notes="$(awk -v v="$V" '
+            $0 ~ "^## \\[?" v "\\]?([^0-9.]|$)" { grab=1; next }
+            grab && /^## / { exit }
+            grab { print }
+          ' CHANGELOG.md 2>/dev/null | sed -e '/./,$!d')"
+          [ -n "$notes" ] || notes="Release ${V}"
+          metadata="$(jq -nc --argjson gv "$ids" --arg cl "$notes" \
+            '{changelog: $cl, changelogType: "markdown", releaseType: "release", gameVersions: $gv}')"
+          curl -sf -H "X-Api-Token: ${CF_API_KEY}" \
+            -F "metadata=${metadata}" \
+            -F "file=@${ZIP}" \
+            "https://wow.curseforge.com/api/projects/${CF_PROJECT_ID}/upload-file"
+          echo "Uploaded ${ZIP} to CurseForge project ${CF_PROJECT_ID}."

@@ -1,0 +1,5 @@
+*.zip
+.DS_Store
+AchievementRarity/LICENSE.txt
+.venv/
+__pycache__/

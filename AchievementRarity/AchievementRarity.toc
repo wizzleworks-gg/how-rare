@@ -1,0 +1,19 @@
+## Interface: 120005, 120007
+## Title: Achievement Rarity
+## Notes: Achievement rarity from gratz.gg — the share of accounts that have each achievement, on every tooltip, chat line and achievement-panel row, plus an earned toast. Data by gratz.gg.
+## Author: gratz.gg
+## Version: 1.0.0
+## SavedVariables: AchievementRarityDB
+## IconTexture: Interface\Icons\Achievement_quests_completed_08
+## AddonCompartmentFunc: AchievementRarity_OnAddonCompartmentClick
+## X-Website: https://gratz.gg
+## Category-enUS: Collections
+
+Data\Meta.lua
+Data\Rarity.lua
+Core.lua
+Options.lua
+Tooltip.lua
+Toast.lua
+Chat.lua
+AchievementUI.lua
