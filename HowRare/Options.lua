@@ -170,8 +170,7 @@ loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", function(self, event, loadedName)
     if event == "PLAYER_LOGIN" then
-        print(string.format("|cffffd100How Rare?|r loaded (as of %s) — /howrare for options",
-            G.AsOfLong()))
+        G.Print(string.format("loaded (as of %s) — /howrare for options", G.AsOfLong()))
         return
     end
     if loadedName ~= addonName then
@@ -198,7 +197,7 @@ local function PrintStatus()
         end
     end
     table.sort(opts)
-    print("|cffffd100How Rare?|r status")
+    G.Print("status")
     print("  version " .. C_AddOns.GetAddOnMetadata(addonName, "Version")
         .. " · region " .. G.region .. " · data as of " .. G.Meta.asOf)
     print("  rarity entries " .. rarityCount
@@ -228,7 +227,7 @@ SlashCmdList.HOWRARE = function(msg)
         G.ShareRarest()
     elseif cmd == "debug" then
         HowRareDB.debug = not HowRareDB.debug
-        print("|cffffd100How Rare?|r debug " .. (HowRareDB.debug and "ON" or "off"))
+        G.Print("debug " .. (HowRareDB.debug and "ON" or "off"))
     else
         -- Bare /howrare (or "options") opens the settings page — there's no window.
         OpenOptions()

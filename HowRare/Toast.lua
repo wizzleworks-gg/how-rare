@@ -366,7 +366,7 @@ local function CaptureSoon(name)
         shotPending = false
         Screenshot()
         C_Timer.After(0.3, function()
-            print(string.format("|cffffd100How Rare?|r screenshot saved%s", name and (": " .. name) or ""))
+            G.Print(string.format("screenshot saved%s", name and (": " .. name) or ""))
         end)
     end)
 end
@@ -501,7 +501,7 @@ end
 local function DebugPin()
     local f = ShowSample(ShowcaseId())
     if not f then
-        print("|cffffd100How Rare?|r toast pin: no client-known achievement.")
+        G.Print("toast pin: no client-known achievement.")
         return
     end
 
@@ -517,7 +517,7 @@ local function DebugPin()
     f.pinReplay:Show()
     f.pinClose:Show()
     f.PlayEffects()
-    print("|cffffd100How Rare?|r toast pinned — Replay effect / Close beneath it.")
+    G.Print("toast pinned — Replay effect / Close beneath it.")
 end
 
 -- Move mode (the options "Move toast" button): a draggable sample toast so the
@@ -533,7 +533,7 @@ function G.ToastMoveMode()
     end
     local f = ShowSample(DebugIds()[1])
     if not f then
-        print("|cffffd100How Rare?|r move toast: no client-known achievement to show.")
+        G.Print("move toast: no client-known achievement to show.")
         return
     end
 
@@ -551,7 +551,7 @@ function G.ToastMoveMode()
             f.moveReset:Hide()
             f:Hide()
             Layout()
-            print("|cffffd100How Rare?|r toast position saved.")
+            G.Print("toast position saved.")
         end)
         f.moveReset = ToastButton(f, "RIGHT", 110, "Reset position", function()
             HowRareDB.toastPos = nil
@@ -560,7 +560,7 @@ function G.ToastMoveMode()
     end
     f.moveLock:Show()
     f.moveReset:Show()
-    print("|cffffd100How Rare?|r drag the toast to place it, then Lock. Reset returns it to default.")
+    G.Print("drag the toast to place it, then Lock. Reset returns it to default.")
 end
 
 -- Debug: /howrare toast [count] — fire `count` (default 1) toasts, mirroring a
@@ -587,14 +587,14 @@ local function DebugToast(rest)
     end
 
     if #ids == 0 then
-        print("|cffffd100How Rare?|r debug toast: no client-known achievement to show.")
+        G.Print("debug toast: no client-known achievement to show.")
         return
     end
 
     for _, id in ipairs(ids) do
         ShowToast(id)
     end
-    print(string.format("|cffffd100How Rare?|r debug toast: fired %d.", #ids))
+    G.Print(string.format("debug toast: fired %d.", #ids))
 end
 
 G.DebugToast = DebugToast
@@ -606,7 +606,7 @@ G.DebugToast = DebugToast
 function G.ShareRarest()
     local _, _, id = G.RarestEarned()
     if not id then
-        print("|cffffd100How Rare?|r nothing to share yet — none of your earned achievements are in this data snapshot.")
+        G.Print("nothing to share yet — none of your earned achievements are in this data snapshot.")
         return
     end
     ShowToast(id, true)

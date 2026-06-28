@@ -46,17 +46,16 @@ end
 -- (AchievementTemplate) and the Summary screen's recent-achievement buttons
 -- (SummaryAchievementTemplate) share that structure. Buttons are pooled and
 -- re-filled, so the text must be set (or cleared) on every fill, not just
--- when first created. AnchorRarity (every paint) pins it to the header line by the
--- shield.
+-- when first created; the % is created and anchored once (AnchorRarity) by the shield.
 local function PaintRarity(button)
     local rarity, rr, rg, rb = G.RarityTextAndColor(button.id)
-    -- The % — created lazily on the first row that has a rarity, then kept and
-    -- re-anchored / re-set (or cleared) on every fill of that pooled button.
+    -- The % — created and anchored lazily on the first row that has a rarity, then
+    -- re-set (or cleared) on every fill of that pooled button.
     if button.HowRareText or rarity then
         if not button.HowRareText then
             button.HowRareText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            AnchorRarity(button)
         end
-        AnchorRarity(button)
         if rarity then
             button.HowRareText:SetTextColor(rr, rg, rb)
         end

@@ -86,6 +86,12 @@ function G.Debug(...)
     end
 end
 
+-- Branded chat line: the gold "How Rare?" prefix every player-facing print shares,
+-- so the brand can't drift across call sites. (Diagnostics use G.Debug.)
+function G.Print(msg)
+    print("|cffffd100How Rare?|r " .. msg)
+end
+
 -- The snapshot date as an exact "11 June 2026", parsed from the ISO date the
 -- data file ships — one precise form everywhere. Memoised; falls back to the raw
 -- ISO string if it can't be parsed.
@@ -165,7 +171,7 @@ local LABEL_HEX = "ffffff"
 
 -- The standard rarity line — every tooltip surface renders this exact string, so
 -- the wording AND its colour treatment can't drift between them. Two inks: the
--- "Rarity:" label muted grey, the % in its rarity-tier colour, so the eye lands on
+-- "Rarity:" label white, the % in its rarity-tier colour, so the eye lands on
 -- the number. The "of active accounts" qualifier and the snapshot date live on the
 -- options page, not on every hover. Callers AddLine this with a neutral (white)
 -- base; each run carries its own |cff..|r, so the base shows only on an uncoloured run.
@@ -349,15 +355,13 @@ end
 
 -- Make `frame` drag-to-move (left button) and persist its point under
 -- HowRareDB[key] in the SavePoint shape. Clamped to screen so a frame
--- can't be dragged off an edge and lost. The `dragging` flag it sets lets a frame
--- that is also clickable tell a drag-release from a click in its own handler.
+-- can't be dragged off an edge and lost.
 function G.MakeDraggable(frame, key)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", function(self)
-        self.dragging = true
         self:StartMoving()
     end)
     frame:SetScript("OnDragStop", function(self)
