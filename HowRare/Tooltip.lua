@@ -7,10 +7,13 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Achievement, functi
     if not G.IsEnabled() then
         return
     end
-    local rarity, rr, rg, rb = G.RarityTextAndColor(data.id)
+    local rarity = G.RarityFor(data.id)
     if not rarity then
         return
     end
-    tooltip:AddLine(G.RarityLine(rarity), rr, rg, rb)
+    -- A blank line sets the rarity off from the achievement's own tooltip text; it
+    -- always lands last. Neutral white base; RarityLine carries the per-run colours.
+    tooltip:AddLine(" ")
+    tooltip:AddLine(G.RarityLine(rarity, data.id), 1, 1, 1)
     tooltip:Show()
 end)

@@ -7,7 +7,9 @@ local DEFAULTS = {
     enabled = true, -- master switch: off silences every automatic surface (G.IsEnabled)
     toast = true, -- companion toast on ACHIEVEMENT_EARNED (replaces Blizzard's alert)
     screenshot = false, -- auto-screenshot the toast on earn (off: it fills the folder)
+    titleColor = true, -- tier-colour panel-row titles by rarity
     scope = "region", -- rarity scope: "region" (your own) or "global" (everyone tracked)
+    previewModifier = "alt", -- click-to-preview modifier: "alt" / "ctrl" / "off"
 }
 -- Rarity on tooltips, chat lines, and panel rows, plus the toast's glow/sweep
 -- flourish, have no toggle of their own — they're the addon's baseline behaviour,
@@ -71,6 +73,19 @@ local function RegisterSettings()
         return MasterOn() and toast:GetValue()
     end)
 
+    -- Tier-colouring of the panel-row titles (on by default). Nested under the
+    -- master switch.
+    local _, titleInit = AddCheckbox("titleColor", "Colour achievement titles by rarity",
+        "Tint each achievement's title in the panel by its rarity tier — the same colours as the rarity %.")
+    DependOn(titleInit, masterInit, MasterOn)
+    -- Repaint the visible rows the moment it flips, so titles colour / restore without
+    -- waiting for the list to re-fill (RepaintRows drives PaintRarity → PaintTitle).
+    Settings.SetOnValueChangedCallback("HOWRARE_TITLECOLOR", function()
+        if G.RepaintRows then
+            G.RepaintRows()
+        end
+    end)
+
     -- A button (not a toggle): reposition where earned toasts appear. Opens the
     -- draggable mover, which closes this panel so the sample is visible. Guarded so
     -- a client without the button-initializer API still renders the panel.
@@ -80,6 +95,23 @@ local function RegisterSettings()
             function() G.ToastMoveMode() end,
             "Drag a sample toast to where you want earned toasts to appear, then Lock. Reset returns it to the default spot.",
             true)) -- addSearchTags: required (asserted non-nil); true makes it searchable
+    end
+
+    -- Click-to-preview: a modifier-click on an achievement pops its earned toast
+    -- (the same card you get on earn), and screenshots it too if that option's on.
+    -- A string dropdown like scope; the click intercept lives in AchievementUI. The
+    -- hover line is gone, so this is also where the gesture is discoverable.
+    local previewSetting = Settings.RegisterAddOnSetting(
+        category, "HOWRARE_PREVIEWMODIFIER", "previewModifier", HowRareDB,
+        Settings.VarType.String, "Preview toast on click", DEFAULTS.previewModifier)
+    if Settings.CreateDropdown then
+        Settings.CreateDropdown(category, previewSetting, function()
+            local container = Settings.CreateControlTextContainer()
+            container:Add("alt", "Alt-click", "Alt-click an achievement to preview its rarity toast.")
+            container:Add("ctrl", "Ctrl-click", "Ctrl-click an achievement to preview its rarity toast.")
+            container:Add("off", "Off", "Don't preview the toast on click.")
+            return container:GetData()
+        end, "Click an achievement with this modifier to pop its earned toast — the rarity celebration card. Works on the achievement-panel rows. Shift-click stays Blizzard's link-to-chat.")
     end
 
     -- Rarity scope: measure against your own region (default) or the whole tracked
@@ -95,7 +127,7 @@ local function RegisterSettings()
         Settings.CreateDropdown(category, scopeSetting, function()
             local container = Settings.CreateControlTextContainer()
             container:Add("region", "Your region", "Rarity among accounts in your own region (US or EU).")
-            container:Add("global", "Global", "Rarity among all accounts gratz.gg tracks worldwide.")
+            container:Add("global", "Global", "Rarity among all accounts tracked worldwide.")
             return container:GetData()
         end, "Whether rarity is measured against your own region or the whole tracked population. Applies everywhere — tooltips, panel rows, chat, and the toast.")
     end
@@ -110,7 +142,7 @@ local function RegisterSettings()
     -- What the percentages mean + the data snapshot's as-of date: a release IS a
     -- data refresh. The denominator shown is the player's own — the same one
     -- every rarity figure in this addon uses. The user opted into this page, so
-    -- this is the natural home for the fuller gratz.gg attribution.
+    -- this is the natural home for the fuller attribution (§4: by The Wizzleworks).
     local scope
     if G.region == "global" then
         scope = string.format("%s active accounts worldwide",
@@ -120,7 +152,7 @@ local function RegisterSettings()
             BreakUpLargeNumbers(G.Meta.accounts[G.region]), G.region:upper())
     end
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
-        string.format("Rarity is the share of %s tracked by gratz.gg", scope)))
+        string.format("Rarity is the share of %s", scope)))
     layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
         string.format("Data snapshot: %s", G.AsOfLong())))
 
@@ -132,8 +164,8 @@ loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", function(self, event, loadedName)
     if event == "PLAYER_LOGIN" then
-        print(string.format("|cffffd100How Rare?|r loaded (as of %s) — /howrare for options · %s",
-            G.AsOfLong(), G.BRAND))
+        print(string.format("|cffffd100How Rare?|r loaded (as of %s) — /howrare for options",
+            G.AsOfLong()))
         return
     end
     if loadedName ~= addonName then

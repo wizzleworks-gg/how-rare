@@ -2,7 +2,7 @@
 -- wrappers over the same internals our own surfaces use, so the API and the addon
 -- can never disagree. Consumers gate on `if HowRareAPI then ... end` and
 -- may check `.version`. All getters take an optional `scope`: "region" (the
--- player's home region, the user's default) or "global". Rarity data by gratz.gg.
+-- player's home region, the user's default) or "global". Rarity data by The Wizzleworks.
 local _, G = ...
 
 HowRareAPI = {
@@ -10,7 +10,7 @@ HowRareAPI = {
     -- gate on `>= n`.
     version = 1,
     -- The data source, for integrators that want to credit it.
-    source = "gratz.gg",
+    source = "The Wizzleworks",
 }
 
 local API = HowRareAPI
@@ -43,7 +43,7 @@ function API:GetColor(achievementID, scope)
     return G.RarityColor(achievementID, scope)
 end
 
--- Formatted attainment string ("3%", "<1%"), matching the gratz.gg site, or nil
+-- Formatted attainment string ("3%", "<1%"), matching the website, or nil
 -- off-snapshot.
 function API:Format(achievementID, scope)
     return G.RarityFor(achievementID, scope)
@@ -71,7 +71,7 @@ end
 function API:GetTiers()
     local out = {}
     for i, t in ipairs(G.TIERS) do
-        local c = ITEM_QUALITY_COLORS[t.quality]
+        local c = t.color or ITEM_QUALITY_COLORS[t.quality]
         out[i] = {
             name = t.name,
             maxPct = math.min(t.max, 100),

@@ -1,5 +1,5 @@
 -- Core.lua — shared namespace: region resolution, rarity lookup, formatting.
--- Formatting mirrors the gratz.gg site: whole percents at/above 1%, "<1%" below —
+-- Formatting mirrors the website: whole percents at/above 1%, "<1%" below —
 -- same numbers, same formatting, both sides.
 local _, G = ...
 
@@ -35,8 +35,6 @@ end
 function G.ScopeIndex(scope)
     return REGION_INDEX[G.ScopeRegion(scope)]
 end
-
-G.BRAND = "gratz.gg"
 
 -- The addon-wide master switch (the "How Rare? enabled" option). Off
 -- silences every automatic surface — tooltip / chat / panel rarity and the earned
@@ -146,14 +144,20 @@ function G.AchievementEarnedShort(id)
     return string.format("%d %s %02d", day, m, year % 100)
 end
 
--- The standard attributed rarity line — every tooltip surface renders this
--- exact string, so the wording can't drift between them. The addon's name is the
--- question and the % is its answer ("How Rare? 3%"), with gratz.gg the source.
--- The "of active accounts" qualifier and the snapshot date live on the options
--- page, not on every hover. Colour treatment (muted question, tier-coloured %,
--- dim source) is tuned at the call sites in-game; this is just the text.
-function G.RarityLine(rarity)
-    return string.format("How Rare? %s · %s", rarity, G.BRAND)
+-- The rarity line's "Rarity:" label ink — white, so only the % carries the tier
+-- colour. White (not a brand colour): the label is just the noun, and the tooltip
+-- stays a neutral functional surface. Matches Chat.lua's enrichment.
+local LABEL_HEX = "ffffff"
+
+-- The standard rarity line — every tooltip surface renders this exact string, so
+-- the wording AND its colour treatment can't drift between them. Two inks: the
+-- "Rarity:" label muted grey, the % in its rarity-tier colour, so the eye lands on
+-- the number. The "of active accounts" qualifier and the snapshot date live on the
+-- options page, not on every hover. Callers AddLine this with a neutral (white)
+-- base; each run carries its own |cff..|r, so the base shows only on an uncoloured run.
+function G.RarityLine(rarity, achievementId, scope)
+    local hex = G.RarityHex(achievementId, scope)
+    return string.format("|cff%sRarity:|r |cff%s%s|r", LABEL_HEX, hex, rarity)
 end
 
 -- Run a callback once Blizzard_AchievementUI is available. It's
@@ -210,22 +214,25 @@ function G.RarityFor(achievementId, scope)
     return G.FormatPct(pct)
 end
 
--- The one brand gold (ffd100): the gratz.gg watermark / attribution colour, and
--- the fallback tint for rarity outside the snapshot.
+-- The one brand gold (ffd100): the toast points-shield number, and the fallback
+-- tint for rarity outside the snapshot.
 G.GOLD = { 1, 0.82, 0 }
 
 -- Rarity tiers, rarest first — the loot-quality idiom: the rarer the achievement,
 -- the higher the band. Each carries the attainment % below which it applies and
 -- the ITEM_QUALITY_COLORS index it borrows. Legendary is deliberately tight
 -- (<0.1%, ~1 in 1,000) so orange stays special; junk (grey) is the ubiquitous
--- tail almost everyone holds. Achievements outside the snapshot get no tier.
+-- tail almost everyone holds. Achievements outside the snapshot get no tier. An
+-- optional `color` overrides the borrowed quality colour for that one tier.
 local TIERS = {
     { name = "legendary", max = 0.1,       quality = 5 }, -- orange
     { name = "epic",      max = 5,         quality = 4 }, -- purple
     { name = "rare",      max = 15,        quality = 3 }, -- blue
     { name = "uncommon",  max = 40,        quality = 2 }, -- green
     { name = "common",    max = 70,        quality = 1 }, -- white
-    { name = "junk",      max = math.huge, quality = 0 }, -- grey
+    -- Junk overrides the loot palette's quality-0 grey (0.62 — washed out on the
+    -- panel's light parchment) with a darker grey so it reads cleanly. Tune the 0.5.
+    { name = "junk",      max = math.huge, quality = 0, color = { r = 0.5, g = 0.5, b = 0.5 } }, -- grey
 }
 G.TIERS = TIERS -- read by the public API's GetTiers
 
@@ -252,7 +259,7 @@ local function rarityTier(achievementId, scope)
         return nil
     end
     local tier = TierForPct(pct)
-    return pct, tier, ITEM_QUALITY_COLORS[tier.quality]
+    return pct, tier, tier.color or ITEM_QUALITY_COLORS[tier.quality]
 end
 
 -- The tier name ("legendary".."junk") for an achievement under a scope, or nil
@@ -297,7 +304,7 @@ function G.RarityTextAndColor(achievementId, scope)
 end
 
 -- Your rarest *earned* achievement across the whole shipped rarity snapshot: of
--- every achievement gratz.gg ships a rarity for that you've completed, the one
+-- every achievement The Wizzleworks ships a rarity for that you've completed, the one
 -- with the lowest region attainment. Returns (name, formattedPct, id), or nil when
 -- none of your earned achievements are in the snapshot. The id lets callers tint
 -- the line by its rarity tier. Shared by the share keybind and the showcase toast.

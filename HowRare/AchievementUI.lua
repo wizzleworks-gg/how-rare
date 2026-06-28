@@ -1,52 +1,107 @@
 -- AchievementUI.lua — rarity in Blizzard's achievement panel: the % painted on
--- every list row (browse-by-rarity while scrolling) plus a hover tooltip with
--- full attribution, via the row's official OnEnter callback event. Augments
--- only the Blizzard frame — KAF's own browser is a separate surface.
+-- every list row (browse-by-rarity while scrolling) and, toggleable, the row title
+-- tinted by rarity tier. Augments only the Blizzard frame — KAF's own browser is a
+-- separate surface.
 local _, G = ...
+
+-- Tier-colouring of the row's title (button.Label), toggleable via
+-- HowRareDB.titleColor (default on). Uses SetVertexColor, the same channel
+-- Blizzard's Saturate/Desaturate drive on the white GameFontHighlightMedium label,
+-- so the tier colour lands true and the default restores exactly (white earned /
+-- grey not). We restore only buttons we coloured (HowRareTitleColored) so Blizzard's
+-- own colour is left alone when the option's off, and we restore them ourselves
+-- because Blizzard re-saturates only on a saturated-style change, not on every
+-- pooled refill. rarity/rr/rg/rb are PaintRarity's single RarityTextAndColor lookup,
+-- threaded through so this costs no extra query.
+local TITLE_DESAT = 0.65
+local function PaintTitle(button, rarity, rr, rg, rb)
+    local label = button.Label
+    if not label then
+        return
+    end
+    if rarity and G.IsEnabled() and HowRareDB and HowRareDB.titleColor then
+        label:SetVertexColor(rr, rg, rb)
+        button.HowRareTitleColored = true
+    elseif button.HowRareTitleColored then
+        local v = G.SelfCompleted(button.id) and 1 or TITLE_DESAT
+        label:SetVertexColor(v, v, v)
+        button.HowRareTitleColored = nil
+    end
+end
+
+-- The % rides the header line, just left of the points shield. One spot for every
+-- row — earned or not (you can track earned achievements too, so earned-vs-unearned
+-- is no basis for it) — always clear of the track control under the icon and the
+-- completion date under the shield. The shield doesn't move when a row drills in, so
+-- the position holds collapsed or expanded. Offsets are first-cut; tune in-game.
+local RARITY_DX = -4  -- gap to the left of the shield
+local RARITY_DY = 17  -- up from the shield's vertical centre, inline with the header text
+local function AnchorRarity(button)
+    local fs = button.HowRareText
+    fs:ClearAllPoints()
+    fs:SetPoint("RIGHT", button.Shield, "LEFT", RARITY_DX, RARITY_DY)
+end
 
 -- Works on any achievement button with .id and .Icon — the category-list rows
 -- (AchievementTemplate) and the Summary screen's recent-achievement buttons
 -- (SummaryAchievementTemplate) share that structure. Buttons are pooled and
 -- re-filled, so the text must be set (or cleared) on every fill, not just
--- when first created.
+-- when first created. AnchorRarity (every paint) pins it to the header line by the
+-- shield.
 local function PaintRarity(button)
     local rarity, rr, rg, rb = G.RarityTextAndColor(button.id)
-    if not button.HowRareText then
-        if not rarity then
+    -- The % — created lazily on the first row that has a rarity, then kept and
+    -- re-anchored / re-set (or cleared) on every fill of that pooled button.
+    if button.HowRareText or rarity then
+        if not button.HowRareText then
+            button.HowRareText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        end
+        AnchorRarity(button)
+        if rarity then
+            button.HowRareText:SetTextColor(rr, rg, rb)
+        end
+        button.HowRareText:SetText((G.IsEnabled() and rarity) or "")
+    end
+    PaintTitle(button, rarity, rr, rg, rb)
+end
+
+-- True when the user's chosen preview modifier (HowRareDB.previewModifier:
+-- "alt"/"ctrl", or "off") is the only modifier held — isolating our gesture from
+-- Blizzard's own modified-clicks (shift links the achievement into chat).
+local function PreviewModifierHeld()
+    local mod = HowRareDB and HowRareDB.previewModifier
+    if mod == "alt" then
+        return IsAltKeyDown() and not IsControlKeyDown() and not IsShiftKeyDown()
+    elseif mod == "ctrl" then
+        return IsControlKeyDown() and not IsAltKeyDown() and not IsShiftKeyDown()
+    end
+    return false
+end
+
+-- Modifier-click a rarity-bearing row → preview its earned toast instead of
+-- selecting/expanding it (and screenshot it too, if that option is on). We wrap the
+-- frame's own OnClick (an ordinary Button, so this is taint-safe) and swallow the
+-- click on our modifier; every other click — Blizzard's shift-link, a plain select —
+-- calls through to the original. Wrapped once per pooled frame (HowRareClickHooked);
+-- the wrapper reads self.id live, so it stays correct as the frame is reused.
+local function HookRowClick(button)
+    if button.HowRareClickHooked then
+        return
+    end
+    button.HowRareClickHooked = true
+    local base = button:GetScript("OnClick")
+    button:SetScript("OnClick", function(self, mouseButton, down)
+        if mouseButton == "LeftButton" and G.IsEnabled() and PreviewModifierHeld()
+            and G.RarityValue(self.id) then
+            if not down then
+                G.ShowToast(self.id, HowRareDB.screenshot)
+            end
             return
         end
-        local fs = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        -- Centred in the ~15px band between the icon's bottom edge and the
-        -- row's bottom (84px row, icon ends at 69).
-        fs:SetPoint("TOP", button.Icon, "BOTTOM", 0, 1)
-        button.HowRareText = fs
-    end
-    if rarity then
-        button.HowRareText:SetTextColor(rr, rg, rb)
-    end
-    button.HowRareText:SetText((G.IsEnabled() and rarity) or "")
-end
-
-local function OnRowEnter(_, button, achievementId)
-    if not G.IsEnabled() then
-        return
-    end
-    local rarity, rr, rg, rb = G.RarityTextAndColor(achievementId)
-    if not rarity then
-        return
-    end
-    GameTooltip:SetOwner(button, "ANCHOR_NONE")
-    GameTooltip:SetPoint("BOTTOMLEFT", button, "TOPLEFT", 0, 2)
-    GameTooltip:AddLine(G.RarityLine(rarity), rr, rg, rb)
-    GameTooltip:Show()
-    button.HowRareTipShown = true
-end
-
-local function OnRowLeave(_, button)
-    if button.HowRareTipShown then
-        button.HowRareTipShown = nil
-        GameTooltip:Hide()
-    end
+        if base then
+            base(self, mouseButton, down)
+        end
+    end)
 end
 
 local function InstallHooks()
@@ -58,16 +113,18 @@ local function InstallHooks()
     -- frame was created.
     ScrollUtil.AddInitializedFrameCallback(scrollBox, function(_, frame)
         PaintRarity(frame)
+        HookRowClick(frame)
     end, G, false)
-    scrollBox:ForEachFrame(PaintRarity)
+    scrollBox:ForEachFrame(function(frame)
+        PaintRarity(frame)
+        HookRowClick(frame)
+    end)
     G.achievementUIHooked = true
     G.Debug("achievement UI hooks installed")
     -- Deliberately NOT painted: the Summary screen (the panel's first-open
     -- landing page). Its recent-achievement buttons are a separate template —
     -- smaller icon, no expander, no room for the % without a layout of its
     -- own. Rarity starts once you're in a category list.
-    EventRegistry:RegisterCallback("AchievementFrameAchievement.OnEnter", OnRowEnter, G)
-    EventRegistry:RegisterCallback("AchievementFrameAchievement.OnLeave", OnRowLeave, G)
 end
 
 -- Re-run the rarity paint over the currently-shown rows — used when the scope

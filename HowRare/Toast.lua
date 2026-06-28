@@ -76,10 +76,13 @@ local SHINE_MARGIN = 0
 -- celebration rather than a competing one.
 local TOAST_ART = "Interface\\AchievementFrame\\AchievementToast"
 
--- Below this region attainment the rarity line reads as a population count ("one
--- of only ~N players") — which lands harder than a sub-1% figure on a rare earn;
--- at or above it, the percentage (a count in the millions is no brag).
-local COUNT_BELOW_PCT = 5
+-- Below this attainment the rarity line reads as a population count ("one of only
+-- ~N people") — which lands harder than a percentage when the number is genuinely
+-- tiny; at or above it, the share as a percentage. Tied to the legendary cutoff
+-- (G.TIERS[1], rarest-first) so the count-form and the legendary band can't drift:
+-- at <0.1% the count is small enough to brag (<~480 in a region), where a sub-5%
+-- count was still ~19k — unimpressive — and a count in the millions is no brag.
+local COUNT_BELOW_PCT = G.TIERS[1].max
 
 local PumpQueue -- forward declaration (the release closure calls it before it's defined)
 
@@ -167,14 +170,6 @@ local function CreateToastFrame(index)
     f.stamp = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.stamp:SetPoint("TOPLEFT", f.rarityPre, "BOTTOMLEFT", 0, -LINE_GAP - 2)
 
-    -- gratz.gg watermark at the bottom — bottom-right corner, in brand gold, below
-    -- the rows and off the earn-time line. The toast is the highest-reach surface
-    -- (built to be screenshotted), so it carries the data attribution.
-    f.brand = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.brand:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -EDGE_INSET, 9)
-    f.brand:SetTextColor(unpack(G.GOLD))
-    f.brand:SetText(G.BRAND)
-
     -- Glow flashes behind the text (sublevel below it, so it brightens without
     -- washing it); the shine sweeps across in front. Both reuse Blizzard's atlas;
     -- the sizes and sweep distance are fitted to our frame by eye. Start invisible.
@@ -242,16 +237,16 @@ local queue = {}
 
 -- The rarity row as three left-to-right pieces — prefix, the approximate "~", and
 -- the rest — so Populate can drop the tilde a couple of px to sit centred against
--- the digits. Rare tiers (under COUNT_BELOW_PCT) read as a population count
--- ("one of only ~N players" — lands harder than "<1%" on a rare earn, and stays
--- truthful as a share of the accounts gratz.gg tracks). The snapshot's as-of is
--- deliberately not shown: the earn timestamp already dates the toast, and a second
--- date would only muddy it. The count takes the rarity-tier colour, the rest stays
--- gold. Common tiers keep the percentage and the off-snapshot fallback its grey
--- note — both carry no tilde, so the prefix holds the whole line and the other two
--- are empty.
--- "EU players" / "accounts worldwide" — the scope-region noun the rarity line
--- ends on. Follows the user's chosen scope (region/global) like every figure here.
+-- the digits. The rarest tier (under COUNT_BELOW_PCT, i.e. legendary) reads as a
+-- population count ("one of only ~N people" — lands harder than a percentage when
+-- the number is genuinely tiny, and stays truthful as a share of the accounts
+-- The Wizzleworks tracks). The snapshot's as-of is deliberately not shown: the earn
+-- timestamp already dates the toast, and a second date would only muddy it. The
+-- count takes the rarity-tier colour, the rest stays gold. The remaining tiers keep
+-- the percentage and the off-snapshot fallback its grey note — both carry no tilde,
+-- so the prefix holds the whole line and the other two are empty.
+-- "EU people" / "accounts worldwide" — the scope-region noun the rarity line ends
+-- on. Follows the user's chosen scope (region/global) like every figure here.
 local function scopeFor(noun)
     local region = G.ScopeRegion()
     return region == "global" and (noun .. " worldwide") or (region:upper() .. " " .. noun)
@@ -267,7 +262,7 @@ local function RarityText(achievementId)
         local n = BreakUpLargeNumbers(G.RarityCounts[achievementId][G.ScopeIndex()])
         return "|cffffd100One of only |r",
             string.format("|cff%s~|r", hex),
-            string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, scopeFor("players"))
+            string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, scopeFor("people"))
     end
     return string.format(
         "|cffffd100Held by |r|cff%s%s|r|cffffd100 of %s.|r", hex, G.FormatPct(pct), scopeFor("accounts")), "", ""
@@ -412,7 +407,7 @@ G.ShowToast = ShowToast
 
 -- Client-known ids from the rarity snapshot for the debug/sample toasts, rarest
 -- (count-form, under COUNT_BELOW_PCT) first so a debug toast shows the "one of
--- only ~N players" count rather than a percentage. Bounded by DEBUG_ID_CAP — the
+-- only ~N people" count rather than a percentage. Bounded by DEBUG_ID_CAP — the
 -- debug/sample paths need only a handful — so it stops once it has enough rather
 -- than scanning the whole snapshot. Rare ids come first; a few percentage-form ids
 -- follow as a fallback when too few rare ones are client-known.

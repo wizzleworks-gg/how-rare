@@ -17,8 +17,8 @@ local function FilterAchievementAnnounce(_, _, msg, author, ...)
     if not rarity then
         return false
     end
-    -- The % takes its rarity-tier colour; the rest of the note stays grey.
-    local suffix = string.format(" |cff999999(rarity |r|cff%s%s|r|cff999999)|r",
+    -- The % takes its rarity-tier colour; "(rarity …)" is white.
+    local suffix = string.format(" |cffffffff(rarity |r|cff%s%s|r|cffffffff)|r",
         G.RarityHex(id), rarity)
     return false, msg .. suffix:gsub("%%", "%%%%"), author, ...
 end
