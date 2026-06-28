@@ -1,15 +1,20 @@
 ## Interface: 120005, 120007
 ## Title: How Rare? — Achievement Rarity
-## Notes: Achievement rarity from The Wizzleworks — the share of accounts that have each achievement, on every tooltip, chat line and achievement-panel row, plus an earned toast. Data by The Wizzleworks.
-## Author: The Wizzleworks
+## Notes: Achievement rarity from the Wizzleworks — the share of accounts that have each achievement, on every tooltip, chat line and achievement-panel row, plus an earned toast. Data by the Wizzleworks.
+## Author: the Wizzleworks
 ## Version: 1.0.0
 ## SavedVariables: HowRareDB
 ## IconTexture: Interface\Icons\Achievement_quests_completed_08
 ## AddonCompartmentFunc: HowRare_OnAddonCompartmentClick
 ## Category-enUS: Collections
 
-Data\Meta.lua
-Data\Rarity.lua
+# Embedded AchievementRarity library (data by the Wizzleworks) — loads before
+# Core, which delegates every rarity lookup to it. LibStub first, then the
+# generated snapshot, then the library's read API.
+Libs\LibStub\LibStub.lua
+Libs\AchievementRarity-1.0\AchievementRarity-Data-1.0.lua
+Libs\AchievementRarity-1.0\AchievementRarity-1.0.lua
+
 Core.lua
 Api.lua
 Options.lua

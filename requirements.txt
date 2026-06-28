@@ -1,3 +1,0 @@
-# Dev/CI only — the data-export script (scripts/export-addon-data.py). Never
-# shipped in the addon zip (release.sh zips only HowRare/).
-psycopg[binary]

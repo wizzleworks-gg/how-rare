@@ -1,18 +1,28 @@
 How Rare? — License
 
-Copyright (c) 2026 The Wizzleworks. All rights reserved.
+Copyright (c) 2026 the Wizzleworks. All rights reserved.
 
-This addon and its associated data files — including the contents of the
-HowRare/Data directory, which are derived from The Wizzleworks rarity
-database — are the property of The Wizzleworks.
+This license covers the How Rare? addon's own code, art, and text: the files under
+HowRare/ *except* the embedded libraries in HowRare/Libs/, which are distributed
+under their own, more permissive licenses (see "Embedded libraries" below).
 
 You are granted a personal, non-exclusive, non-transferable license to download
 and use this addon, as distributed through CurseForge, within World of Warcraft
 for personal, non-commercial purposes.
 
-No part of this addon or its data may be copied, modified, redistributed,
-sublicensed, sold, or used to create derivative works without the express prior
-written permission of The Wizzleworks.
+No part of this addon — excluding the embedded libraries below — may be copied,
+modified, redistributed, sublicensed, sold, or used to create derivative works
+without the express prior written permission of the Wizzleworks.
+
+Embedded libraries
+------------------
+HowRare/Libs/ contains libraries governed by their own licenses, NOT this one:
+
+  - LibStub (HowRare/Libs/LibStub/) — public domain.
+  - AchievementRarity (HowRare/Libs/AchievementRarity-1.0/) — the rarity data and
+    tier helpers, by the Wizzleworks, under the MIT License. The rarity numbers are
+    facts compiled by the Wizzleworks and may be reused under MIT; the canonical
+    source is https://github.com/wizzleworks-gg/achievement-rarity.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS

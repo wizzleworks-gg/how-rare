@@ -1,10 +1,10 @@
 # How Rare?
 
-A World of Warcraft in-game addon that surfaces The Wizzleworks' corpus-derived
-achievement **rarity** (the share of accounts that have each achievement) on
-tooltips, chat announcements, Blizzard achievement-panel rows, and an earned
-toast. Lua, packaged for CurseForge. Data ships baked from The Wizzleworks rarity
-corpus (exported from the sibling `gratz` repo).
+A World of Warcraft in-game addon that surfaces corpus-derived achievement
+**rarity** (the share of accounts that have each achievement) on tooltips, chat
+announcements, Blizzard achievement-panel rows, and an earned toast. Lua, packaged
+for CurseForge. The rarity numbers come from the **AchievementRarity** library by
+the Wizzleworks, which this addon embeds and is the **reference consumer** of.
 
 ## Origin
 
@@ -15,19 +15,27 @@ other two; the architecture and the rationale for the split live in
 `gratz-addon/docs/addon-architecture.md`. This repo is **rarity only** — no HUD
 bar, no curated browser, no scanner/inspect/ranking code.
 
-The companion **website** and the **data pipeline** live in the sibling `gratz`
-repo. The rarity numbers are produced there (`public.achievement_rarity` +
-`public.rarity_meta`) and exported into this addon's `Data/` by
-`scripts/export-addon-data.py`.
+The rarity **data** was then extracted into its own embeddable LibStub library,
+**AchievementRarity** (sibling `achievement-rarity` repo, MIT), with How Rare? as its
+reference consumer — the decision + plan are in
+`gratz-addon/docs/rarity-data-library.md`. The numbers are produced in the sibling
+`gratz` repo (`public.achievement_rarity` + `public.rarity_meta`) and exported into
+the library by gratz's `scripts/export-rarity-library.py`; How Rare? embeds a copy of
+that library under `HowRare/Libs/` and delegates every rarity lookup to it.
 
 ## Layout
 
 - `HowRare/` — the addon itself (this folder name is the WoW AddOn id
   and the SavedVariables key; the displayed title is set by `## Title:` in the TOC).
-  - `Data/Meta.lua`, `Data/Rarity.lua` — **generated**, do not hand-edit (baked
-    rarity snapshot).
-  - `Core.lua` — namespace: region resolution, rarity lookup/colour/format, the
-    snapshot-date helpers, draggable-frame persistence.
+  - `Libs/` — the embedded **AchievementRarity** library it delegates to: `LibStub/`
+    plus `AchievementRarity-1.0/` (the **generated** data snapshot + the read API).
+    Do not hand-edit; refresh by re-copying from the `achievement-rarity` repo. These
+    load first in the TOC, before `Core.lua`.
+  - `Core.lua` — namespace: holds the library handle (`G.AR`) and the `G.*` rarity
+    helpers every surface calls, all delegating to the library (the snapshot-date
+    helpers, the off-snapshot brand-gold fallback, draggable-frame persistence).
+  - `Api.lua` — `HowRareAPI`, a thin back-compat shim forwarding to the library; new
+    integrators should use `LibStub("AchievementRarity-1.0")` directly.
   - `Tooltip.lua` / `Chat.lua` / `AchievementUI.lua` — the rarity surfaces
     (achievement tooltips, incoming chat announcements, panel-row paint + hover).
   - `Toast.lua` — the earned toast (replaces Blizzard's alert while on) + the
@@ -36,33 +44,33 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
     (`/hr`) slash, the addon-compartment entry.
   - `Bindings.xml` — the "Share rarest achievement" keybind. Auto-loaded from the
     addon root by the client; **must not** be listed in the TOC.
-- `scripts/export-addon-data.py` — regenerates `Data/` from The Wizzleworks rarity
-  database (dev/CI only — never shipped in the zip).
-- `scripts/release.sh` — builds the CurseForge upload zip from the TOC version.
+- `scripts/release.sh` — builds the CurseForge upload zip from the TOC version
+  (zips all of `HowRare/`, so the embedded library ships in it).
 
 ## Conventions
 
-- SavedVariables table: `HowRareDB`. Global debug handle:
-  `HowRare` (e.g. `/dump HowRare.RarityCounts`).
+- SavedVariables table: `HowRareDB`. Global debug handle: `HowRare` (e.g.
+  `/dump HowRare.AR:GetMeta()`, or `/dump LibStub("AchievementRarity-1.0"):GetMeta()`).
 - Slash: `/howrare` and `/hr` (`status`, `toast [n|pin]`, `share`, `debug`; bare
   opens options).
 - **Naming: brand headline "How Rare?", descriptive subtitle for discovery,
-  The Wizzleworks as data attribution.** The CurseForge/TOC title is **"How Rare? —
+  the Wizzleworks as data attribution.** The CurseForge/TOC title is **"How Rare? —
   Achievement Rarity"**: "How Rare?" is the brand (and the question a player asks on
   hover), and "Achievement Rarity" rides along as the searchable phrase (CurseForge
   indexes the Name/Summary, not the folder/repo). The runtime surfaces themselves
   stay **functional and brand-silent**: the tooltip reads `Rarity: 3%`, the panel a
   bare `%`, the chat tag `(rarity 3%)`, and the toast carries no brand — none of them
-  advertise. **The Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
+  advertise. **the Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
   separate website product, *not* the data owner — see
   `gratz-addon/docs/rarity-data-library.md`), credited only where someone asks
   "where's this from?": the options page (the fuller attribution there is pending —
   the §4 options-copy pass). The internal identity is `HowRare` (folder, `HowRareDB`,
   globals); the slash stays the functional `/howrare`. See §11 of the architecture
   doc.
-- Interface colours: rarity tiers reuse `ITEM_QUALITY_COLORS` (loot-quality
-  bands); the one brand gold is `ffd100` (`G.GOLD`), used for attribution and the
-  off-snapshot fallback tint.
+- Interface colours: rarity tiers (defined in the embedded library) reuse
+  `ITEM_QUALITY_COLORS` (loot-quality bands); the one brand gold is `ffd100`
+  (`G.GOLD`) — How Rare?'s own, used for attribution and the off-snapshot fallback
+  tint (the library returns nil off-snapshot; the gold fallback lives here).
 
 ## Live WoW client (local testing)
 
@@ -71,10 +79,12 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
   are live on the next `/reload`. Blizzard ships no default-UI Lua/XML on disk —
   read it from the `Gethe/wow-ui-source` mirror, not the install.
 - Lua errors are hidden unless `/console scriptErrors 1` (or BugSack) is on.
+- Library smoke-test: `/dump LibStub("AchievementRarity-1.0"):GetMeta()`.
 
 ## Releasing
 
-Refresh `Data/` from PROD, add a `## <version>` section to `CHANGELOG.md`, bump
-`## Version:` in the TOC, then tag `vX.Y.Z` and push the tag — CI builds the zip
-and (once `CF_API_KEY` + `CF_PROJECT_ID` are set on the repo) uploads to
-CurseForge. Doc/workflow details in `README.md`.
+Update the embedded library (`HowRare/Libs/`, see README "Updating the embedded
+library"), add a `## <version>` section to `CHANGELOG.md`, bump `## Version:` in the
+TOC, then tag `vX.Y.Z` and push the tag — CI builds the zip and (once `CF_API_KEY` +
+`CF_PROJECT_ID` are set on the repo) uploads to CurseForge. Doc/workflow details in
+`README.md`.

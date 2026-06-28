@@ -78,11 +78,11 @@ local TOAST_ART = "Interface\\AchievementFrame\\AchievementToast"
 
 -- Below this attainment the rarity line reads as a population count ("one of only
 -- ~N people") — which lands harder than a percentage when the number is genuinely
--- tiny; at or above it, the share as a percentage. Tied to the legendary cutoff
--- (G.TIERS[1], rarest-first) so the count-form and the legendary band can't drift:
+-- tiny; at or above it, the share as a percentage. Tied to the library's rarest
+-- tier (its legendary cutoff) so the count-form and the legendary band can't drift:
 -- at <0.1% the count is small enough to brag (<~480 in a region), where a sub-5%
 -- count was still ~19k — unimpressive — and a count in the millions is no brag.
-local COUNT_BELOW_PCT = G.TIERS[1].max
+local COUNT_BELOW_PCT = G.AR:GetTiers()[1].maxPct
 
 local PumpQueue -- forward declaration (the release closure calls it before it's defined)
 
@@ -240,7 +240,7 @@ local queue = {}
 -- the digits. The rarest tier (under COUNT_BELOW_PCT, i.e. legendary) reads as a
 -- population count ("one of only ~N people" — lands harder than a percentage when
 -- the number is genuinely tiny, and stays truthful as a share of the accounts
--- The Wizzleworks tracks). The snapshot's as-of is deliberately not shown: the earn
+-- the Wizzleworks tracks). The snapshot's as-of is deliberately not shown: the earn
 -- timestamp already dates the toast, and a second date would only muddy it. The
 -- count takes the rarity-tier colour, the rest stays gold. The remaining tiers keep
 -- the percentage and the off-snapshot fallback its grey note — both carry no tilde,
@@ -259,7 +259,7 @@ local function RarityText(achievementId)
     end
     local hex = G.RarityHex(achievementId)
     if pct < COUNT_BELOW_PCT then
-        local n = BreakUpLargeNumbers(G.RarityCounts[achievementId][G.ScopeIndex()])
+        local n = BreakUpLargeNumbers(G.AR:GetCount(achievementId, G.Scope()))
         return "|cffffd100One of only |r",
             string.format("|cff%s~|r", hex),
             string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, scopeFor("people"))
@@ -414,7 +414,7 @@ G.ShowToast = ShowToast
 local DEBUG_ID_CAP = 12
 local function DebugIds()
     local rare, rest = {}, {}
-    for id in pairs(G.RarityCounts) do
+    for id in pairs(G.AR:GetData()) do
         if G.AchievementInfo(id) then
             local pct = G.RarityValue(id)
             if pct and pct < COUNT_BELOW_PCT then
@@ -444,7 +444,7 @@ end
 local SHOWCASE_NAME_MAX = 22
 local function ShowcaseId()
     local best, bestVal, fallback, fallbackVal
-    for id in pairs(G.RarityCounts) do
+    for id in pairs(G.AR:GetData()) do
         local name = G.AchievementInfo(id)
         if name then
             local val = G.RarityValue(id) or 100

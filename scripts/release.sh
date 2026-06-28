@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the CurseForge upload zip from the addon folder. The version comes
-# from the TOC — bump it there first. Refresh Data/ from PROD before zipping.
+# from the TOC — bump it there first. Update HowRare/Libs/ (the embedded
+# AchievementRarity library) before zipping; see README "Updating the embedded library".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

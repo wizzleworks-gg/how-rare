@@ -1,16 +1,20 @@
--- Api.lua — the public, read-only, versioned API other addons build on. Thin
--- wrappers over the same internals our own surfaces use, so the API and the addon
--- can never disagree. Consumers gate on `if HowRareAPI then ... end` and
--- may check `.version`. All getters take an optional `scope`: "region" (the
--- player's home region, the user's default) or "global". Rarity data by The Wizzleworks.
+-- Api.lua — HowRareAPI: the addon's original public API, kept as a thin back-compat
+-- shim. The rarity data + tier opinion now live in the embedded AchievementRarity
+-- library, which IS the public surface going forward — new integrators should reach
+-- the data directly:
+--     local AR = LibStub("AchievementRarity-1.0", true)
+-- HowRareAPI remains so anything already gating on `if HowRareAPI then ... end` keeps
+-- working; every method forwards to How Rare?'s Core helpers, which delegate to the
+-- library and carry How Rare?'s own off-snapshot brand-gold fallback. Rarity data by
+-- the Wizzleworks.
 local _, G = ...
 
 HowRareAPI = {
-    -- Bump on breaking changes; additive changes keep the version. Consumers
-    -- gate on `>= n`.
+    -- Unchanged from before the library split; consumers gate on `>= n`. (The
+    -- library carries its own raw/opinion contract version via its LibStub major.)
     version = 1,
     -- The data source, for integrators that want to credit it.
-    source = "The Wizzleworks",
+    source = G.AR.source,
 }
 
 local API = HowRareAPI
@@ -24,11 +28,7 @@ end
 -- The raw account count behind the percentage (for "one of only N"), or nil
 -- off-snapshot.
 function API:GetCount(achievementID, scope)
-    local counts = G.RarityCounts[achievementID]
-    if not counts then
-        return nil
-    end
-    return counts[G.ScopeIndex(scope)]
+    return G.AR:GetCount(achievementID, scope or G.Scope())
 end
 
 -- The rarity tier name: "legendary" / "epic" / "rare" / "uncommon" / "common" /
@@ -50,39 +50,21 @@ function API:Format(achievementID, scope)
 end
 
 -- Snapshot metadata: the as-of date, the per-region active-account denominators,
--- the player's home region, and the user's current scope. A fresh table each call
--- so consumers can't mutate ours.
+-- the player's home region, the data version (minor), and the user's current scope
+-- (How Rare?'s own option). A fresh table each call so consumers can't mutate ours.
 function API:GetMeta()
-    return {
-        asOf = G.Meta.asOf,
-        accounts = {
-            us = G.Meta.accounts.us,
-            eu = G.Meta.accounts.eu,
-            global = G.Meta.accounts.global,
-        },
-        region = G.region,
-        scope = G.Scope(),
-    }
+    local meta = G.AR:GetMeta()
+    meta.scope = G.Scope()
+    return meta
 end
 
--- The tier bands, rarest first: { name, maxPct, r, g, b } — for consumers that
--- want to band rarity themselves. maxPct is the attainment % below which the tier
--- applies (the open-ended top tier reports 100). A fresh table each call.
+-- The tier bands, rarest first: { name, maxPct, r, g, b } — for consumers that want
+-- to band rarity themselves. A fresh table each call.
 function API:GetTiers()
-    local out = {}
-    for i, t in ipairs(G.TIERS) do
-        local c = t.color or ITEM_QUALITY_COLORS[t.quality]
-        out[i] = {
-            name = t.name,
-            maxPct = math.min(t.max, 100),
-            r = c.r, g = c.g, b = c.b,
-        }
-    end
-    return out
+    return G.AR:GetTiers()
 end
 
--- Casing forgiveness: `HowRareAPI` is canonical (matches the achievementID
--- argument casing), but integrators reach for `Api` by reflex — alias it so a
--- mistyped global resolves to the same table instead of a silent nil.
+-- Casing forgiveness: `HowRareAPI` is canonical (matches the achievementID argument
+-- casing), but integrators reach for `Api` by reflex — alias it so a mistyped global
+-- resolves to the same table instead of a silent nil.
 HowRareApi = HowRareAPI
-

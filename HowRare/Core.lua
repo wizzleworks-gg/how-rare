@@ -5,15 +5,20 @@ local _, G = ...
 
 HowRare = G -- global handle for /dump debugging
 
--- The player's home region: own region for US/EU, global for everyone else
--- (kr/tw/cn) — mirrors the site's standingRegionFor. This is the "region" scope's
--- target; "global" scope always reads the global column.
-local REGION_BY_ID = { [1] = "us", [3] = "eu" }
-G.region = REGION_BY_ID[GetCurrentRegion()] or "global"
+-- The rarity data + the loot-quality tier opinion now live in the embedded
+-- AchievementRarity library; How Rare? is its reference consumer. Core keeps the
+-- same G.* helper names every surface already calls, but their bodies delegate to
+-- the library — one source of truth, and a fresher standalone copy can supersede
+-- the embedded one at runtime, so we hold the stable lib handle and call it live,
+-- never caching its data. Loaded before Core via the Libs block in the .toc.
+local AR = assert(LibStub and LibStub:GetLibrary("AchievementRarity-1.0", true),
+    "How Rare? needs the embedded AchievementRarity-1.0 library loaded first (Libs before Core in the .toc)")
+G.AR = AR
 
--- Index into the packed {us, eu, global} count triples in Data/Rarity.lua.
--- Read via G.ScopeIndex(scope), which resolves the active scope to a column.
-local REGION_INDEX = { us = 1, eu = 2, global = 3 }
+-- The player's home region (own region for US/EU, "global" for kr/tw/cn) — the
+-- library resolves it the way the site's standingRegionFor does. Stable, so read
+-- once; "global" scope always reads the global column.
+G.region = AR:GetMeta().region
 
 -- Rarity scope: "region" (the player's home region, default) or "global". A saved
 -- option (Options.lua); every rarity surface and the public API read it through
@@ -24,16 +29,13 @@ function G.Scope()
 end
 
 -- The data region a scope reads: "global" → global; "region"/default → home.
+-- The toast's scope-region noun reads this; the library does its own column
+-- resolution internally, so there's no ScopeIndex here any more.
 function G.ScopeRegion(scope)
     if (scope or G.Scope()) == "global" then
         return "global"
     end
     return G.region
-end
-
--- The {us, eu, global} column index for a scope.
-function G.ScopeIndex(scope)
-    return REGION_INDEX[G.ScopeRegion(scope)]
 end
 
 -- The addon-wide master switch (the "How Rare? enabled" option). Off
@@ -103,47 +105,32 @@ local ABBR_MONTHS = {
     "Jan", "Feb", "Mar", "Apr", "May", "Jun",
     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 }
--- Parse the snapshot's ISO date once into y, m, d numbers (nil if unparseable),
--- so the long and short formatters below share a single parse of G.Meta.asOf.
-local parsedY, parsedM, parsedD, parsed
+-- Parse the snapshot's ISO date into y, m, d numbers (nil if unparseable). Read
+-- live from the library's meta each call rather than memoised: a fresher standalone
+-- copy can supersede the embedded snapshot at runtime, and the parse is cheap on
+-- the cold paths this serves (login line / options page / per-toast stamp).
 local function SnapshotYMD()
-    if not parsed then
-        parsed = true
-        local y, m, d = (G.Meta.asOf or ""):match("(%d+)-(%d+)-(%d+)")
-        parsedY, parsedM, parsedD = tonumber(y), tonumber(m), tonumber(d)
-    end
-    return parsedY, parsedM, parsedD
+    local y, m, d = (AR:GetMeta().asOf or ""):match("(%d+)-(%d+)-(%d+)")
+    return tonumber(y), tonumber(m), tonumber(d)
 end
 
-local asOfLong
 function G.AsOfLong()
-    if asOfLong then
-        return asOfLong
-    end
     local y, m, d = SnapshotYMD()
     if y and MONTHS[m] then
-        asOfLong = string.format("%d %s %d", d, MONTHS[m], y)
-    else
-        asOfLong = G.Meta.asOf or ""
+        return string.format("%d %s %d", d, MONTHS[m], y)
     end
-    return asOfLong
+    return AR:GetMeta().asOf or ""
 end
 
 -- The snapshot date in the compact "Jun 26" form (abbreviated month + 2-digit
 -- year) the toast uses to mark its rarity as current — a shareable card wants the
--- month, not a precise day. Memoised; falls back to the raw ISO string.
-local asOfShort
+-- month, not a precise day. Falls back to the raw ISO string.
 function G.AsOfShort()
-    if asOfShort then
-        return asOfShort
-    end
     local y, m = SnapshotYMD()
     if y and ABBR_MONTHS[m] then
-        asOfShort = string.format("%s %02d", ABBR_MONTHS[m], y % 100)
-    else
-        asOfShort = G.Meta.asOf or ""
+        return string.format("%s %02d", ABBR_MONTHS[m], y % 100)
     end
-    return asOfShort
+    return AR:GetMeta().asOf or ""
 end
 
 -- The date an achievement was earned, as "18 Jun 26", or nil if it isn't
@@ -199,132 +186,80 @@ function G.OnAchievementUILoaded(callback)
     end)
 end
 
+-- The rarity helpers below delegate to the library. Each defaults an unspecified
+-- scope to the user's saved option (G.Scope()) — the same default every surface has
+-- always used — then hands the library an explicit "region"/"global". The
+-- off-snapshot fallback (brand gold) is How Rare?'s own; the library returns nil.
+
 -- No false precision: whole-% at/above 1%, "<1%" below. pct is 0–100.
 function G.FormatPct(pct)
-    if pct < 1 then
-        return "<1%"
-    end
-    return math.floor(pct + 0.5) .. "%"
+    return AR:FormatPct(pct)
 end
 
--- The attainment as a raw percent (0–100) under a scope ("region"/default or
--- "global"), or nil when the achievement isn't in the shipped snapshot. The
--- numeric basis for the formatted line, the panel-row paint, and the API — one
--- source so they can't drift.
+-- The attainment as a raw percent (0–100) under a scope (default: the user's saved
+-- scope), or nil when the achievement isn't in the library's snapshot.
 function G.RarityValue(achievementId, scope)
-    local counts = G.RarityCounts[achievementId]
-    if not counts then
-        return nil
-    end
-    local region = G.ScopeRegion(scope)
-    local denom = G.Meta.accounts[region]
-    if not denom or denom == 0 then
-        return nil
-    end
-    return counts[REGION_INDEX[region]] / denom * 100
+    return AR:GetRarity(achievementId, scope or G.Scope())
 end
 
--- Formatted attainment ("3%", "<1%") under a scope, or nil when the achievement
--- isn't in the shipped snapshot (newer than the data files).
+-- Formatted attainment ("3%", "<1%") under a scope, or nil off-snapshot.
 function G.RarityFor(achievementId, scope)
-    local pct = G.RarityValue(achievementId, scope)
-    if not pct then
-        return nil
-    end
-    return G.FormatPct(pct)
+    return AR:Format(achievementId, scope or G.Scope())
 end
 
 -- The one brand gold (ffd100): the toast points-shield number, and the fallback
--- tint for rarity outside the snapshot.
+-- tint for rarity outside the library's snapshot. The loot-quality tier palette
+-- itself now lives in the library (AR:GetColor / AR:GetTier / AR:GetTiers); this
+-- gold is the product's own off-snapshot choice, so it stays here, not in the lib.
 G.GOLD = { 1, 0.82, 0 }
-
--- Rarity tiers, rarest first — the loot-quality idiom: the rarer the achievement,
--- the higher the band. Each carries the attainment % below which it applies and
--- the ITEM_QUALITY_COLORS index it borrows. Legendary is deliberately tight
--- (<0.1%, ~1 in 1,000) so orange stays special; junk (grey) is the ubiquitous
--- tail almost everyone holds. Achievements outside the snapshot get no tier. An
--- optional `color` overrides the borrowed quality colour for that one tier.
-local TIERS = {
-    { name = "legendary", max = 0.1,       quality = 5 }, -- orange
-    { name = "epic",      max = 5,         quality = 4 }, -- purple
-    { name = "rare",      max = 15,        quality = 3 }, -- blue
-    { name = "uncommon",  max = 40,        quality = 2 }, -- green
-    { name = "common",    max = 70,        quality = 1 }, -- white
-    -- Junk overrides the loot palette's quality-0 grey (0.62 — washed out on the
-    -- panel's light parchment) with a darker grey so it reads cleanly. Tune the 0.5.
-    { name = "junk",      max = math.huge, quality = 0, color = { r = 0.5, g = 0.5, b = 0.5 } }, -- grey
-}
-G.TIERS = TIERS -- read by the public API's GetTiers
-
-local function TierForPct(pct)
-    for _, t in ipairs(TIERS) do
-        if pct < t.max then
-            return t
-        end
-    end
-    return TIERS[#TIERS]
-end
 
 -- The brand gold as a "rrggbb" hex, derived from G.GOLD so the two can't drift —
 -- the off-snapshot fallback for RarityHex.
 local GOLD_HEX = string.format("%02x%02x%02x",
     math.floor(G.GOLD[1] * 255 + 0.5), math.floor(G.GOLD[2] * 255 + 0.5), math.floor(G.GOLD[3] * 255 + 0.5))
 
--- The pct, the tier entry, and its ITEM_QUALITY_COLORS colour for an achievement
--- under a scope, or nil when it's outside the shipped snapshot. One place for the
--- band → tier → colour mapping; the helpers below just shape its output.
-local function rarityTier(achievementId, scope)
-    local pct = G.RarityValue(achievementId, scope)
-    if not pct then
-        return nil
-    end
-    local tier = TierForPct(pct)
-    return pct, tier, tier.color or ITEM_QUALITY_COLORS[tier.quality]
-end
-
 -- The tier name ("legendary".."junk") for an achievement under a scope, or nil
 -- off-snapshot. Backs the API's GetTier.
 function G.RarityTier(achievementId, scope)
-    local _, tier = rarityTier(achievementId, scope)
-    return tier and tier.name
+    return AR:GetTier(achievementId, scope or G.Scope())
 end
 
 -- r, g, b (0–1) for an achievement's rarity tier; brand gold when off-snapshot.
 function G.RarityColor(achievementId, scope)
-    local _, _, c = rarityTier(achievementId, scope)
-    if not c then
+    local r, g, b = AR:GetColor(achievementId, scope or G.Scope())
+    if not r then
         return G.GOLD[1], G.GOLD[2], G.GOLD[3]
     end
-    return c.r, c.g, c.b
+    return r, g, b
 end
 
--- "rrggbb" hex of the same tier colour, for inline |cff..|r colouring in strings.
--- Built from the same r,g,b RarityColor uses — not sliced from the engine's own
--- .hex, whose markup form varies by client ("ffRRGGBB" vs "|cffRRGGBB", the latter
--- leaving stray chars after a fixed sub) — so the inline and SetTextColor paths
--- stay byte-identical; brand gold when off-snapshot.
+-- "rrggbb" hex of the same tier colour, for inline |cff..|r colouring in strings;
+-- brand gold when off-snapshot. Built from the same r,g,b RarityColor uses, so the
+-- inline and SetTextColor paths stay byte-identical.
 function G.RarityHex(achievementId, scope)
-    local _, _, c = rarityTier(achievementId, scope)
-    if not c then
+    local r, g, b = AR:GetColor(achievementId, scope or G.Scope())
+    if not r then
         return GOLD_HEX
     end
     return string.format("%02x%02x%02x",
-        math.floor(c.r * 255 + 0.5), math.floor(c.g * 255 + 0.5), math.floor(c.b * 255 + 0.5))
+        math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
 end
 
 -- One lookup, both outputs a list row needs: the formatted attainment string (or
--- nil, off-snapshot) and the tier colour r, g, b. Saves calling RarityFor and
--- RarityColor separately on the same id per row.
+-- nil, off-snapshot) and the tier colour r, g, b (brand gold off-snapshot). Saves
+-- calling RarityFor and RarityColor separately on the same id per row.
 function G.RarityTextAndColor(achievementId, scope)
-    local pct, _, c = rarityTier(achievementId, scope)
-    if not c then
-        return nil, G.GOLD[1], G.GOLD[2], G.GOLD[3]
+    scope = scope or G.Scope()
+    local text = AR:Format(achievementId, scope)
+    local r, g, b = AR:GetColor(achievementId, scope)
+    if not r then
+        return text, G.GOLD[1], G.GOLD[2], G.GOLD[3]
     end
-    return G.FormatPct(pct), c.r, c.g, c.b
+    return text, r, g, b
 end
 
 -- Your rarest *earned* achievement across the whole shipped rarity snapshot: of
--- every achievement The Wizzleworks ships a rarity for that you've completed, the one
+-- every achievement the Wizzleworks ships a rarity for that you've completed, the one
 -- with the lowest region attainment. Returns (name, formattedPct, id), or nil when
 -- none of your earned achievements are in the snapshot. The id lets callers tint
 -- the line by its rarity tier. Shared by the share keybind and the showcase toast.
@@ -333,7 +268,7 @@ end
 -- completion calls are bounded to genuine improvements, not the whole snapshot.
 function G.RarestEarned(scope)
     local rarestId, rarestVal
-    for id in pairs(G.RarityCounts) do
+    for id in pairs(AR:GetData()) do
         local val = G.RarityValue(id, scope)
         if val and (not rarestVal or val < rarestVal) and G.SelfCompleted(id) then
             rarestVal, rarestId = val, id

@@ -1,95 +1,75 @@
-# HANDOVER — rarity data → embeddable library (next theme)
+# HANDOVER — rarity data → embeddable library (BUILT, pending in-game verify + commit)
 
 **This theme:** extract the baked rarity **data** out of How Rare? into a standalone,
 **embeddable LibStub library** (a Wizzleworks asset). How Rare? becomes its **reference
-consumer** — it embeds the library and still works standalone. The library is also
-publishable on its own (a side channel for freshness + third-party discovery).
+consumer** — it embeds the library and still works standalone.
 
-**Read first:** `../gratz-addon/docs/rarity-data-library.md` — the full decision record
-(why a library; embed + optional standalone with freshest-wins; the supply-vs-opinionate
-API split; permissive licensing; the Wizzleworks brand model). It also amends
-`../gratz-addon/docs/addon-architecture.md` §5/§10. **That doc is the *why*; this is the
-*how*.** Direction there is the source of truth; the code is the source of truth for what
-exists today (the addon bakes its data inline — nothing is extracted yet).
+**Status: built locally, NOT committed and NOT in-game verified.** Code/lint pass
+(syntax-checked + a Lua delegation-faithfulness harness, 91 assertions green), but only
+the author can confirm the in-game surfaces. Nothing is committed in either repo yet.
 
-## Previous theme — shipped
+**Decision record:** `../gratz-addon/docs/rarity-data-library.md` (the *why*). Open
+decisions there are now ratified — see below.
 
-The How Rare? polish/copy pass + the gratz.gg → The Wizzleworks reframe + a
-review/simplification pass are **committed** on `main` (`075956d`, `3f16689`, `3fa76d5`,
-`89ba403`) but **not pushed**. Two loose ends fold into this theme (see "Carried over").
+## Ratified this session
 
-## The seam — what moves, what stays (already roughly built)
+- **Name:** LibStub `AchievementRarity-1.0`; GitHub repo `achievement-rarity` (sibling of
+  `how-rare`/`gratz`). No "Lib" prefix (mirrors MountsRarity).
+- **Brand:** **"the Wizzleworks"** — lowercase article, the name is "Wizzleworks". Swept
+  through the library + How Rare? (gratz site/docs still say "The Wizzleworks" — the
+  deferred ecosystem sweep the decision doc §6 flagged).
+- **Licence:** library **MIT** (holder "the Wizzleworks"); How Rare? stays ARR with an
+  explicit carve-out for `HowRare/Libs/` (LibStub public-domain, AchievementRarity MIT).
+- **Minor-version scheme:** `MINOR = days since 2020-01-01` of the snapshot date
+  (freshest-wins keys on it; idempotent on re-export). 2026-06-28 → **2370**.
+- **Methodology home:** the library README's "How the numbers work" (adapted from gratz's
+  `/about/numbers` page) — decoupled from gratz, as wanted.
+- **Scope this build:** extract + embed only. Standalone CurseForge publish and the
+  crawler→export→push automation are explicitly **deferred** (separate work).
 
-The doc's supply-vs-opinionate split maps cleanly onto today's `Core.lua` / `Api.lua`:
+## What's built (uncommitted)
 
-- **Raw — the hard contract → library.** `RarityValue` / `RarityCounts` (the `{us,eu,global}`
-  count triples) / `Meta.accounts` denominators / `Meta.asOf` / region + scope resolution
-  (`region`, `Scope`, `ScopeRegion`, `ScopeIndex`). A consumer must be able to get the **%**
-  without ever touching our bands.
-- **Opinion — optional helper → library (overridable).** `TIERS` (cut-points + names + the
-  loot-quality colours, incl. the junk-grey override) → `RarityTier` / `RarityColor` /
-  `RarityHex` / `RarityTextAndColor`, and `FormatPct`. Expose the band table so a consumer
-  can re-band from the raw number (the MJE path).
-- **Stays in How Rare? (product, not data).** `RarityLine` ("Rarity: 3%"), the toast / panel
-  paint / chat / options surfaces, `G.Print`. These are the product's look, not the corpus.
-- **Template for the library's public surface:** today's `HowRareAPI` (`Api.lua`) already has
-  the right shape — `GetRarity` / `GetCount` / `GetTier` / `GetColor` / `Format` / `GetMeta` /
-  `GetTiers` + a `source` field. The library exposes essentially this; How Rare? then wraps or
-  drops its own copy.
+**`achievement-rarity` repo** (git-initialised, no commits): MIT LICENSE, README (with
+methodology), CHANGELOG, `Libs/LibStub/LibStub.lua`, `AchievementRarity-1.0/` (static
+`AchievementRarity-1.0.lua` code + generated `AchievementRarity-Data-1.0.lua`), standalone
+`AchievementRarity.toc`. Data = **prod snapshot 2026-06-28** (8353 achievements).
 
-## Naming (open — author to ratify)
+**`gratz` repo:** new `scripts/export-rarity-library.py` (retargeted from the old
+how-rare exporter; same SQL; emits the library's version-stamped data file; default
+`--out` points at the sibling library repo). The old `how-rare/scripts/export-addon-data.py`
++ `requirements.txt` are **deleted** (How Rare? no longer generates data).
 
-Floated: github repo **`achievement-rarity`**. Recommendation, mirroring the live precedent
-**MountsRarity** (a pure-data rarity lib, in the doc's evidence): LibStub name
-**`AchievementRarity`**, versioned **`AchievementRarity-1.0`** (no "Lib" prefix). Keeps
-"How Rare?" as the *product* brand and names the *library* descriptively (so it's findable
-for "rarity"). **Bump the minor on every data refresh** — freshest-wins arbitration keys on
-it.
+**`how-rare` repo (How Rare? = reference consumer):**
+- Embeds `HowRare/Libs/LibStub` + `HowRare/Libs/AchievementRarity-1.0` (listed first in the
+  TOC, before Core). Inline `HowRare/Data/` **deleted**.
+- `Core.lua` holds the stable lib handle `G.AR` and delegates every rarity helper to it
+  **live** (a fresher standalone copy can supersede the embedded one at runtime, so we hold
+  the handle and call methods live, never caching `GetData()`/`GetMeta()` results). The
+  off-snapshot **brand-gold fallback stays in How Rare?**; the library returns nil.
+- `Toast.lua` / `Options.lua` repointed off the old `G.RarityCounts`/`G.Meta`/`G.TIERS`
+  tables onto live `G.AR:GetData()` / `:GetCount()` / `:GetMeta()` / `:GetTiers()`.
+  `Tooltip/Chat/AchievementUI` were helper-only — untouched.
+- `Api.lua` (`HowRareAPI`) kept as a thin back-compat shim forwarding to Core/the lib.
+- Docs (README, LICENSE, CLAUDE.md, release.sh/yml comments) reframed to the consumer model.
 
-## Concrete steps (sketch)
+## Next steps
 
-1. New repo `achievement-rarity`; a LibStub skeleton (`LibStub:NewLibrary("AchievementRarity-1.0", n)`).
-2. Retarget the export: `scripts/export-addon-data.py` emits the **library's** data file (the
-   `{us,eu,global}` triples + meta), stamped with the minor version.
-3. Library exposes the raw getters + the opinion layer (tiers / colours / format),
-   `source = "The Wizzleworks"`.
-4. How Rare? **embeds** it (`Libs/AchievementRarity-1.0/`, listed in the TOC before `Core.lua`)
-   and rewrites `Core`'s rarity helpers to delegate to `LibStub("AchievementRarity-1.0")`. Drop
-   the inline `Data/` once delegated.
-5. **License the library permissive (MIT)** — *not* ARR (an ARR lib can't legally be embedded,
-   which defeats the model). How Rare? the app stays ARR.
-6. **Verify byte-identical numbers** before/after — the library's output must match today's
-   baked values (the export already proves out against the DB).
-7. Publish the standalone CurseForge page once the **API contract** (name + raw/opinion shape)
-   is stable — *not* gated on a second consumer (doc §3/§9).
-
-## Carried over from the polish theme (resolve here)
-
-- **"How the numbers work" link** — the deferred §4 options button + its copyable URL. Blocked
-  on the **funnel/hub destination** (also why `## X-Website` is empty): gratz.gg vs a
-  Wizzleworks hub (doc §6 open sub-question). Decide alongside the library publish; the link
-  likely points at wherever the methodology page lands.
-- **Push** — `main` has 4 unpushed commits. Pushing doesn't deploy anything on this repo (its
-  release is tag-triggered and inert until `CF_API_KEY` + `CF_PROJECT_ID` are set).
-
-## Open decisions (author to ratify — doc §9 + here)
-
-- Exact library + repo name (lead: `AchievementRarity` / `achievement-rarity`).
-- Minor-version scheme.
-- Exact permissive licence (MIT or another attribution licence).
-- When to publish the standalone CurseForge page.
-- Funnel/hub destination (the carried-over link).
+1. **In-game verify** (only the author can): `/reload`, hover a tooltip, open the panel,
+   `/howrare` options, `/howrare toast`, `/howrare share`. Confirm numbers/tiers/toast read
+   as before and `/dump LibStub("AchievementRarity-1.0"):GetMeta()` works. (Note: numbers
+   shifted slightly vs the old baked 06-24 snapshot — this build also refreshed to prod 06-28.)
+2. **Commit** both repos once verified (library repo's first commit; how-rare's "adopt the
+   AchievementRarity library" commit; gratz's exporter). Nothing pushed yet.
+3. **Deferred (own work):** crawler→export→push automation; standalone CurseForge publish;
+   the options-page "How the numbers work" link (now points at the library repo — wire once
+   the repo is public); the gratz-side "The Wizzleworks → the Wizzleworks" consistency sweep.
 
 ## In-game testing (unchanged)
 
-- Symlinked: `Interface/AddOns/HowRare` → this repo's `HowRare/`. `/reload` for edits; a
-  *renamed* addon needs a relog. An embedded lib is just more files under `HowRare/` — same
-  `/reload`.
-- API smoke-test: `/dump HowRareAPI:GetMeta()` (and, once embedded,
-  `/dump LibStub("AchievementRarity-1.0"):GetMeta()`).
+- Symlinked: `Interface/AddOns/HowRare` → this repo's `HowRare/`. `/reload` for edits.
+- An embedded lib is just more files under `HowRare/Libs/` — same `/reload`.
 - Lua errors hidden unless `/console scriptErrors 1` (or BugSack).
 
 ## Delete me
 
-The polish/reframe theme is shipped; this file now tracks the library-extraction theme.
-Delete it when the library ships and How Rare? consumes it.
+Delete when the library ships (committed + in-game verified + the standalone published).

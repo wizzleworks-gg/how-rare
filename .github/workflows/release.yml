@@ -1,8 +1,8 @@
 name: Release
 
 # Deliberate release trigger only — pushing a version tag (v1.2.3) or the manual
-# "Run workflow" button. Plain pushes to a branch do NOT release; refresh the
-# Data/ snapshot and commit it before tagging (see README "Releasing").
+# "Run workflow" button. Plain pushes to a branch do NOT release; update the embedded
+# AchievementRarity library and commit it before tagging (see README "Releasing").
 on:
   push:
     tags: ['v*']

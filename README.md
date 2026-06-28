@@ -2,8 +2,9 @@
 
 A World of Warcraft companion addon that shows **how rare each achievement is** —
 the share of accounts that have earned it — right where you see achievements in
-game. The numbers come from **The Wizzleworks**, baked in as a periodic
-snapshot.
+game. The numbers come from **the Wizzleworks**, supplied by the embedded
+[AchievementRarity](https://github.com/wizzleworks-gg/achievement-rarity) library —
+How Rare? is its reference consumer.
 
 ## Features
 
@@ -29,9 +30,12 @@ and keeps its settings in local SavedVariables — it never sends anything anywh
 
 ## How the data works
 
-WoW addons are sandboxed — no internet access at runtime — so every number ships
-baked in, as a periodic snapshot from The Wizzleworks. Each figure carries its own
-"as of" date, and a new release is a fresh snapshot.
+The rarity numbers come from the **AchievementRarity** library by the Wizzleworks,
+which How Rare? embeds (under `HowRare/Libs/`) and delegates every rarity lookup to.
+WoW addons are sandboxed — no internet access at runtime — so the library ships its
+data baked in, as a periodic snapshot; each figure carries its own "as of" date, and
+a new release embeds a fresher one. For how the numbers are measured, see the
+library's [How the numbers work](https://github.com/wizzleworks-gg/achievement-rarity#how-the-numbers-work).
 
 ## Development
 
@@ -42,21 +46,18 @@ ln -s "$(pwd)/HowRare" \
   "/Applications/World of Warcraft/_retail_/Interface/AddOns/HowRare"
 ```
 
-### Refreshing the shipped data
+### Updating the embedded library
 
-The numbers in `HowRare/Data/` are a snapshot pulled from The Wizzleworks rarity
-database (`scripts/export-addon-data.py`, dev/CI only — never shipped in the zip).
-Refresh them before a release:
+The rarity data lives in the
+[AchievementRarity](https://github.com/wizzleworks-gg/achievement-rarity) repo, which
+How Rare? embeds under `HowRare/Libs/AchievementRarity-1.0/`. To ship a fresher
+snapshot, regenerate the library's data there (from the gratz repo's
+`scripts/export-rarity-library.py`, which pulls PROD), then re-copy the library folder
+into `HowRare/Libs/` and commit:
 
 ```sh
-python -m venv .venv && .venv/bin/pip install -r requirements.txt
-# Tunnel to the prod DB, then run the export against it:
-ssh -N -L 15432:localhost:5432 root@<prod-host> &
-.venv/bin/python scripts/export-addon-data.py \
-    --database-url postgresql://gratz:gratz@localhost:15432/gratz
+cp -R ../achievement-rarity/AchievementRarity-1.0 HowRare/Libs/
 ```
-
-Commit the regenerated `HowRare/Data/*.lua`.
 
 ### Releasing
 
@@ -77,4 +78,6 @@ for testing. CurseForge upload is inert until the `CF_API_KEY` secret and
 
 ## License
 
-© 2026 The Wizzleworks. All rights reserved. See [LICENSE](LICENSE).
+© 2026 the Wizzleworks. All rights reserved — see [LICENSE](LICENSE). The embedded
+libraries under `HowRare/Libs/` keep their own licenses: LibStub (public domain) and
+AchievementRarity (MIT — the rarity data by the Wizzleworks).
