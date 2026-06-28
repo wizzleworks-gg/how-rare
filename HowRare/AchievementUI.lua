@@ -65,19 +65,6 @@ local function PaintRarity(button)
     PaintTitle(button, rarity, rr, rg, rb)
 end
 
--- True when the user's chosen preview modifier (HowRareDB.previewModifier:
--- "alt"/"ctrl", or "off") is the only modifier held — isolating our gesture from
--- Blizzard's own modified-clicks (shift links the achievement into chat).
-local function PreviewModifierHeld()
-    local mod = HowRareDB and HowRareDB.previewModifier
-    if mod == "alt" then
-        return IsAltKeyDown() and not IsControlKeyDown() and not IsShiftKeyDown()
-    elseif mod == "ctrl" then
-        return IsControlKeyDown() and not IsAltKeyDown() and not IsShiftKeyDown()
-    end
-    return false
-end
-
 -- Modifier-click a rarity-bearing row → preview its earned toast instead of
 -- selecting/expanding it (and screenshot it too, if that option is on). We wrap the
 -- frame's own OnClick (an ordinary Button, so this is taint-safe) and swallow the
@@ -91,7 +78,7 @@ local function HookRowClick(button)
     button.HowRareClickHooked = true
     local base = button:GetScript("OnClick")
     button:SetScript("OnClick", function(self, mouseButton, down)
-        if mouseButton == "LeftButton" and G.IsEnabled() and PreviewModifierHeld()
+        if mouseButton == "LeftButton" and G.IsEnabled() and G.PreviewModifierHeld()
             and G.RarityValue(self.id) then
             if not down then
                 G.ShowToast(self.id, HowRareDB.screenshot)

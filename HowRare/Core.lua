@@ -45,6 +45,20 @@ function G.IsEnabled()
     return HowRareDB ~= nil and HowRareDB.enabled ~= false
 end
 
+-- True when the user's chosen click-to-preview modifier (HowRareDB.previewModifier:
+-- "alt"/"ctrl", or "off") is the only modifier held — isolating the gesture from
+-- Blizzard's own modified-clicks (shift links an achievement into chat). Shared by
+-- the panel-row click intercept (AchievementUI) and the chat-link one (Chat).
+function G.PreviewModifierHeld()
+    local mod = HowRareDB and HowRareDB.previewModifier
+    if mod == "alt" then
+        return IsAltKeyDown() and not IsControlKeyDown() and not IsShiftKeyDown()
+    elseif mod == "ctrl" then
+        return IsControlKeyDown() and not IsAltKeyDown() and not IsShiftKeyDown()
+    end
+    return false
+end
+
 -- pcall: GetAchievementInfo hard-errors on ids unknown to this client build (the
 -- shipped rarity ids come from the web API, which can run ahead of the client); a
 -- stray id must degrade at the call site, never error. Nil name = unknown.

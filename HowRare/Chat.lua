@@ -25,3 +25,20 @@ end
 
 ChatFrame_AddMessageEventFilter("CHAT_MSG_GUILD_ACHIEVEMENT", FilterAchievementAnnounce)
 ChatFrame_AddMessageEventFilter("CHAT_MSG_ACHIEVEMENT", FilterAchievementAnnounce)
+
+-- Click-to-preview from a chat link: a modifier-click (HowRareDB.previewModifier) on
+-- a linked achievement pops its rarity toast — the same gesture as on a panel row, so
+-- it works everywhere an achievement appears. A post-hook (the standard SetItemRef
+-- hook), so Blizzard still opens the panel to the achievement and we add the toast on
+-- top — the panel opening is useful navigation from a link, unlike the in-panel expand
+-- we suppress on a row. Only our Alt/Ctrl modifier is taken; Blizzard's own
+-- modified-clicks (link / track, whichever the client binds) pass through untouched.
+hooksecurefunc("SetItemRef", function(link)
+    if not (G.IsEnabled() and G.PreviewModifierHeld()) then
+        return
+    end
+    local id = tonumber(link and link:match("^achievement:(%d+)"))
+    if id and G.RarityValue(id) then
+        G.ShowToast(id, HowRareDB.screenshot)
+    end
+end)
