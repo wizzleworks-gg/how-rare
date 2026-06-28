@@ -1,9 +1,10 @@
 # How Rare?
 
-A World of Warcraft in-game addon that surfaces gratz.gg's corpus-derived
+A World of Warcraft in-game addon that surfaces The Wizzleworks' corpus-derived
 achievement **rarity** (the share of accounts that have each achievement) on
 tooltips, chat announcements, Blizzard achievement-panel rows, and an earned
-toast. Lua, packaged for CurseForge. Data ships baked from the gratz.gg DB.
+toast. Lua, packaged for CurseForge. Data ships baked from The Wizzleworks rarity
+corpus (exported from the sibling `gratz` repo).
 
 ## Origin
 
@@ -24,7 +25,7 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
 - `HowRare/` — the addon itself (this folder name is the WoW AddOn id
   and the SavedVariables key; the displayed title is set by `## Title:` in the TOC).
   - `Data/Meta.lua`, `Data/Rarity.lua` — **generated**, do not hand-edit (baked
-    gratz.gg snapshot).
+    rarity snapshot).
   - `Core.lua` — namespace: region resolution, rarity lookup/colour/format, the
     snapshot-date helpers, draggable-frame persistence.
   - `Tooltip.lua` / `Chat.lua` / `AchievementUI.lua` — the rarity surfaces
@@ -35,8 +36,8 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
     (`/hr`) slash, the addon-compartment entry.
   - `Bindings.xml` — the "Share rarest achievement" keybind. Auto-loaded from the
     addon root by the client; **must not** be listed in the TOC.
-- `scripts/export-addon-data.py` — regenerates `Data/` from the gratz.gg DB
-  (dev/CI only — never shipped in the zip).
+- `scripts/export-addon-data.py` — regenerates `Data/` from The Wizzleworks rarity
+  database (dev/CI only — never shipped in the zip).
 - `scripts/release.sh` — builds the CurseForge upload zip from the TOC version.
 
 ## Conventions
@@ -46,17 +47,19 @@ repo. The rarity numbers are produced there (`public.achievement_rarity` +
 - Slash: `/howrare` and `/hr` (`status`, `toast [n|pin]`, `share`, `debug`; bare
   opens options).
 - **Naming: brand headline "How Rare?", descriptive subtitle for discovery,
-  gratz.gg as data attribution.** The CurseForge/TOC title is **"How Rare? —
-  Achievement Rarity"**: "How Rare?" is the brand (and doubles as the tooltip
-  question — "How Rare? 3%" — since the name *is* the question a player asks on
+  The Wizzleworks as data attribution.** The CurseForge/TOC title is **"How Rare? —
+  Achievement Rarity"**: "How Rare?" is the brand (and the question a player asks on
   hover), and "Achievement Rarity" rides along as the searchable phrase (CurseForge
-  indexes the Name/Summary, not the folder/repo). gratz.gg is the **data** source,
-  credited only where it reaches a non-user or answers "where's this number from?"
-  — the toast (screenshotted → travels) and the options page — not on the purely
-  functional addon-user-only surfaces (the inline % under the icon, the incoming
-  chat tag). The internal identity is `HowRare` (folder, `HowRareDB`, globals);
-  the slash stays the functional `/howrare` (brand isn't forced onto it). See §11 of
-  the architecture doc.
+  indexes the Name/Summary, not the folder/repo). The runtime surfaces themselves
+  stay **functional and brand-silent**: the tooltip reads `Rarity: 3%`, the panel a
+  bare `%`, the chat tag `(rarity 3%)`, and the toast carries no brand — none of them
+  advertise. **The Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
+  separate website product, *not* the data owner — see
+  `gratz-addon/docs/rarity-data-library.md`), credited only where someone asks
+  "where's this from?": the options page (the fuller attribution there is pending —
+  the §4 options-copy pass). The internal identity is `HowRare` (folder, `HowRareDB`,
+  globals); the slash stays the functional `/howrare`. See §11 of the architecture
+  doc.
 - Interface colours: rarity tiers reuse `ITEM_QUALITY_COLORS` (loot-quality
   bands); the one brand gold is `ffd100` (`G.GOLD`), used for attribution and the
   off-snapshot fallback tint.

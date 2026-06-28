@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export the Achievement Rarity addon's data files (baked Lua tables).
 
-Reads the same tables the gratz.gg site reads — public.achievement_rarity +
+Reads the same tables the website reads — public.achievement_rarity +
 public.rarity_meta (the rarity counter's output) — so the addon cannot disagree
 with the site. Emits into HowRare/Data/:
 
@@ -54,7 +54,7 @@ def fetch(db_url: str):
 
 def header(as_of: date) -> str:
     return (
-        "-- GENERATED from gratz.gg - do not edit by hand.\n"
+        "-- GENERATED from The Wizzleworks - do not edit by hand.\n"
         f"-- Rarity counter snapshot as of {as_of.isoformat()}.\n"
     )
 

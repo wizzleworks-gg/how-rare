@@ -2,7 +2,7 @@
 
 A World of Warcraft companion addon that shows **how rare each achievement is** —
 the share of accounts that have earned it — right where you see achievements in
-game. The numbers come from [gratz.gg](https://gratz.gg), baked in as a periodic
+game. The numbers come from **The Wizzleworks**, baked in as a periodic
 snapshot.
 
 ## Features
@@ -12,10 +12,10 @@ surface; the toast and its screenshot have their own toggles beneath it. Open th
 options with `/howrare` or Settings → AddOns → How Rare?.
 
 - **Rarity everywhere** — every achievement tooltip, incoming guild/nearby chat
-  announcement, and Blizzard achievement-panel row gets its rarity:
-  `Rarity: 3% of active accounts — gratz.gg (24 June 2026)`. Panel rows are tinted
-  by rarity tier (the loot-quality colours), so you can browse by rarity at a
-  glance while scrolling.
+  announcement, and Blizzard achievement-panel row gets its rarity (a tooltip
+  reads `Rarity: 3%`). Panel rows — and, on by default, the achievement titles —
+  are tinted by rarity tier (the loot-quality colours), so you can browse by
+  rarity at a glance while scrolling.
 - **Earned toast** — a companion toast on achievement earn carrying the rarity,
   styled to be screenshotted; it replaces Blizzard's own alert while on (optional
   auto-screenshot on earn). `/howrare share` (or the "Share rarest achievement"
@@ -30,7 +30,7 @@ and keeps its settings in local SavedVariables — it never sends anything anywh
 ## How the data works
 
 WoW addons are sandboxed — no internet access at runtime — so every number ships
-baked in, as a periodic snapshot from gratz.gg. Each figure carries its own
+baked in, as a periodic snapshot from The Wizzleworks. Each figure carries its own
 "as of" date, and a new release is a fresh snapshot.
 
 ## Development
@@ -44,7 +44,7 @@ ln -s "$(pwd)/HowRare" \
 
 ### Refreshing the shipped data
 
-The numbers in `HowRare/Data/` are a snapshot pulled from the gratz.gg
+The numbers in `HowRare/Data/` are a snapshot pulled from The Wizzleworks rarity
 database (`scripts/export-addon-data.py`, dev/CI only — never shipped in the zip).
 Refresh them before a release:
 
@@ -77,4 +77,4 @@ for testing. CurseForge upload is inert until the `CF_API_KEY` secret and
 
 ## License
 
-© 2026 gratz.gg. All rights reserved. See [LICENSE](LICENSE).
+© 2026 The Wizzleworks. All rights reserved. See [LICENSE](LICENSE).

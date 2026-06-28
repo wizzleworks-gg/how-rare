@@ -1,4 +1,4 @@
--- GENERATED from gratz.gg - do not edit by hand.
+-- GENERATED from The Wizzleworks - do not edit by hand.
 -- Rarity counter snapshot as of 2026-06-24.
 local _, G = ...
 G.Meta = {
