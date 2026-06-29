@@ -5,7 +5,8 @@
 **rarity on dungeon/raid content** (Encounter Journal, map pins, Group Finder) as a
 separate track. All **in How Rare?** (the rarity layer). Design agreed 2026-06-28,
 **revised 2026-06-29** — the foundation changed from a client-side stamp to a
-gratz-side rank metric (see below). **Not yet built.**
+gratz-side rank metric (see below). **Track 1 (the foundation) is BUILT + committed
+(2026-06-29); surfaces (Track 2) are next, instance rarity (Track 3) is its own session.**
 
 Builds on the architecture doc (`../gratz-addon/docs/addon-architecture.md`): §6
 (rarity-at-earn), §7 (instance→achievement map), §3③ (the dropped instance-tooltips
@@ -71,10 +72,11 @@ binary-searches *your* earn date against these and **interpolates** to a percent
 - **Coverage: all achievements** (not rare-only). "Nice to know" justifies it and the
   size is fine. The only filter is **data quality**: skip achievements with too few
   total holders (noisy percentiles) — a correctness floor, not a coverage cut.
-- **Encoding:** prefer a **packed-string, decode-on-query** scheme (the RaiderIO
-  technique) — full coverage at ~1–1.5 MB on disk / ~1–2 MB resident. Naive nested
-  tables (`[id]={{…},{…},{…}}`) are ~2.4 MB / ~10 MB resident — also acceptable.
-  Decide once we measure the generated file. *(WoW loads addon data by parsing the
+- **Encoding: SHIPPED nested** (`[id]={{us…},{eu…},{global…}}`, a sub-floor scope as
+  `{}`). The generated file measured **~1.6 MB** (ranks ~1.4 MB over the counts' 246 KB) —
+  comfortably single-digit-MB resident, well under the naive-nested estimate. A
+  packed-string / delta-encoding (the RaiderIO technique) stays the lever if it ever grows;
+  not needed now. *(WoW loads addon data by parsing the
   whole Lua file into memory at load — no lazy per-entry disk read — so resident
   memory is the constraint; encoding is the lever. For reference: ATT holds 100+ MB,
   RaiderIO tens of MB. Single-digit MB here is unremarkable.)*
@@ -85,8 +87,10 @@ binary-searches *your* earn date against these and **interpolates** to a percent
 
 The game's earn date is unreliable for very old **account-wide** achievements —
 back-credited to the system-launch floor (≈ 2008-10-14) in a pile-up, or zero/empty.
-**Rule:** if the earn date is at/below the launch floor (derivable as the corpus
-minimum, no magic constant) or zero, **suppress** the rank line *and* the "~X ago".
+**Rule:** if the earn date is at/below the launch floor (a **FIXED constant, 14 Oct 2008
+/ patch 3.0.2** — *not* the corpus minimum, which a stray zero/garbage date would drag
+too low) or zero, **suppress** the rank line *and* the "~X ago". The dev run confirmed the
+observed corpus-min earn date == the fixed floor, validating the constant.
 
 ### Building it gratz-side — folds into the existing nightly rarity pass
 
@@ -111,13 +115,15 @@ current rarity snapshot. The rank metric rides on the **same single pass**:
 - **Box storage:** the DB only needs the compact breakpoint summary (single-digit MB),
   not a forward curve. The box has ~51 GB free; this is a non-issue.
 
-### Library + addon read path (to build)
+### Library + addon read path — BUILT (`achievement-rarity@3354034`, `how-rare@2119486`)
 
-- `AchievementRarity-1.0` gains a rank lookup (e.g. `:RankAtEarn(id, earnDayOffset,
-  scope) → percentile`) over the shipped breakpoints, with the interpolation + the
-  bad-date floor inside the library (one source of truth, like `FormatPct`).
-- `Core.lua` gets a `G.*` helper that reads the user's earn date
-  (`G.AchievementEarnedShort` already extracts it) and calls the library.
+- `AchievementRarity-1.0` gained `:RankAtEarn(id, earnTime, scope) → percentile` over the
+  shipped breakpoints — interpolation + the bad-date floor inside the library (one source
+  of truth, like `FormatPct`). `earnTime` is epoch seconds; the floor is parsed from
+  `lib.rankFloor` and the ladder from `lib.rankLadder`, both shipped in the data file.
+- `Core.lua` gained `G.RankAtEarn(id, scope)` — reads the user's earn date via
+  `GetAchievementInfo` (same extraction as `G.AchievementEarnedShort`), converts to epoch
+  via `time{}`, and calls the library. Value only; wording/surfacing is Track 2.
 
 ---
 
@@ -215,19 +221,28 @@ Rare?, rarity-focused — the dropped ③ instance-tooltips addon's surfaces fol
 
 Two independent tracks; the surfaces depend only on Track 1.
 
-1. **Foundation (gratz-side):** breakpoint computation folded into `rarity-counter.py`
-   → export into the `AchievementRarity` library → library rank-lookup API → `Core.lua`
-   helper. *Cheap; rides an existing nightly pass.*
-2. **Surfaces (addon):** tooltip → chat → toast rank lines (read Track 1). Small; the
+1. **Foundation (gratz-side): BUILT + committed (`gratz@19940f3`,
+   `achievement-rarity@3354034`/`@21feb6c`, `how-rare@2119486`).** Breakpoint computation
+   folded into `rarity-counter.py` → export into the `AchievementRarity` library → library
+   rank-lookup API → `Core.lua` helper. Rode the existing nightly pass as planned.
+   Validated end-to-end on the dev DB (offsets monotone, the observed corpus-min earn date
+   == the fixed floor). **Not yet on prod**, and the embedded data file is still the
+   no-ranks prod snapshot — see the publish milestone before in-game testing.
+2. **Surfaces (addon): NEXT.** tooltip → chat → toast rank lines (read Track 1). Small; the
    files already do ~90% of the work. The row stays rarity (no change).
 3. **Instance rarity (separate session, above):** independent of 1 & 2; the larger,
    self-contained piece with its own work area and its own maintenance tail.
 
-## Open items (small, settle in-build)
+## Open items
 
-- Exact breakpoint ladder + the data-quality holder-count floor.
-- Packed vs nested encoding — decide once the generated file is measured.
-- Final wording, confirmed in-game.
+- ~~Exact breakpoint ladder + the data-quality holder-count floor.~~ **Decided:** ladder
+  `0,1,2,3,4,5,7,10,15,20,30,50,75,100`; holder floor 100 per scope; floor fixed at
+  14 Oct 2008 (not corpus-min — robust against stray zero/garbage dates).
+- ~~Packed vs nested encoding — decide once the generated file is measured.~~ **Decided:
+  nested** — the generated file measured ~1.6 MB (ranks ~1.4 MB over counts), comfortably
+  single-digit-MB resident. Delta-encoding the monotone offsets is the lever if it ever
+  grows; not needed now.
+- Final wording, confirmed in-game (Track 2).
 
 ---
 
@@ -235,10 +250,33 @@ Two independent tracks; the surfaces depend only on Track 1.
 
 - **Publish milestone — do these together, once v1 is settled:**
   - Crawler → export → push automation (run `gratz/scripts/export-rarity-library.py`
-    after the rarity counter, push the `achievement-rarity` repo). The rank-breakpoint
-    export folds into this same step.
+    after the rarity counter, push the `achievement-rarity` repo, **re-embed both halves
+    into `HowRare/Libs/`**). The rank-breakpoint export folds into this same step. How
+    Rare? embeds *copies* (not symlinks), so the embedded data file is whatever the last
+    publish baked — keep it on the rarity-refresh cadence so the embedded baseline never
+    drifts far. Releases ship PROD numbers (tunnel to prod, export, re-embed); the
+    committed embed must never carry dev numbers.
   - Standalone CurseForge publish of the library + a release workflow (none yet).
   - gratz-site attribution reframe ("gratz.gg-supplied" → "the Wizzleworks"; casing).
+- **Distribution model — DECIDED (revisited 2026-06-29): embed-first, optional
+  standalone, NOT a hard dependency.** Every consumer embeds the library (always works
+  standalone); the standalone CurseForge copy is *optional*, declared `## OptionalDeps`
+  in consumers — a load-order hint + a CurseForge suggestion, never a load failure if
+  absent. **LibStub freshest-wins IS the reference switch** (no manual "use external if
+  present" code): a consumer just calls `GetLibrary` and transparently gets the freshest
+  copy, embed or standalone. There is one shared table per major on a client, so multiple
+  embedders (How Rare? + a hypothetical Krowi) converge to the single freshest snapshot —
+  **no cross-surface divergence**, and only the winner's table is built (no double
+  memory). Two guards keep that invariant: (a) **keep the MAJOR string stable** — bump
+  `-1.0`→`-2.0` only on a breaking API change (a bump fragments data until consumers
+  reconverge); (b) the static API half is now **freshest-API-wins gated** on its own
+  `API_MINOR` (`achievement-rarity@21feb6c`), so consumers embedding different API
+  versions can't clobber each other into a mixed-version API. *Hard-dep was reconsidered
+  and rejected:* WoW's platform dep tooling is weak (a missing/disabled dep just disables
+  the consumer), so a hard dep would put the headline value behind a fragile external
+  moving part for **no divergence benefit freshest-wins doesn't already provide**.
+  Revisit only if multiple independent consumers AND a *measured* stale-baseline problem
+  emerge — and even then the WoW-native answer is usually still embed + freshest-wins.
 - **Options "How the numbers work" link** → a doc in the `achievement-rarity` repo
   serving both audiences (how to *use* the library + the methodology). README already
   covers both; a dedicated landing doc is optional. (Repo is public, so unblocked.)
