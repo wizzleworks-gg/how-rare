@@ -202,6 +202,27 @@ function G.RarityValue(achievementId, scope)
     return AR:GetRarity(achievementId, scope or G.Scope())
 end
 
+-- Your rank-at-earn percentile (0–100) for an achievement under a scope (default: the
+-- saved scope) — "you were in the first N% of holders to earn this" — or nil when not
+-- completed, off-snapshot, below the scope's holder floor, or the recorded earn date is
+-- unreliable (at/below the system-launch floor; the library suppresses it). Reads the
+-- player's OWN recorded earn date (month/day/year from GetAchievementInfo, like
+-- AchievementEarnedShort), so it's retroactive — it works for achievements earned long
+-- before How Rare? was installed. pcall: GetAchievementInfo hard-errors on ids unknown to
+-- this client build. The library owns the interpolation + floor; this just sources the
+-- date. (Wording/surfacing is a later track — this is the value, unformatted.)
+function G.RankAtEarn(achievementId, scope)
+    local ok, _, _, _, completed, month, day, year = pcall(GetAchievementInfo, achievementId)
+    if not ok or not completed or not month or month == 0 then
+        return nil
+    end
+    -- GetAchievementInfo's year is 2-digit on some builds, full on others (mirrors
+    -- AchievementEarnedShort's year % 100); time{} needs a full year.
+    local fullYear = year < 100 and (2000 + year) or year
+    local earnTime = time({ year = fullYear, month = month, day = day })
+    return AR:RankAtEarn(achievementId, earnTime, scope or G.Scope())
+end
+
 -- Formatted attainment ("3%", "<1%") under a scope, or nil off-snapshot.
 function G.RarityFor(achievementId, scope)
     return AR:Format(achievementId, scope or G.Scope())
