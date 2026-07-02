@@ -5,18 +5,23 @@ local addonName, G = ...
 
 local DEFAULTS = {
     enabled = true, -- master switch: off silences every automatic surface (G.IsEnabled)
-    toast = true, -- companion toast on ACHIEVEMENT_EARNED (replaces Blizzard's alert)
-    screenshot = false, -- auto-screenshot the toast on earn (off: it fills the folder)
+    tooltip = true, -- rarity (and your rank) on achievement tooltips (G.SurfaceOn)
+    chat = true, -- rarity + your status on incoming achievement announcements
+    panel = true, -- the rarity % painted on achievement-panel rows
     titleColor = true, -- tier-colour panel-row titles by rarity
+    toast = true, -- companion toast on ACHIEVEMENT_EARNED (replaces Blizzard's alert)
+    screenshot = "off", -- auto-screenshot mode: "off" / "rare" (rare-and-rarer tiers) / "all"
     scope = "region", -- rarity scope: "region" (your own) or "global" (everyone tracked)
     previewModifier = "alt", -- click-to-preview modifier: "alt" / "ctrl" / "off"
 }
--- Rarity on tooltips, chat lines, and panel rows, plus the toast's glow/sweep
--- flourish, have no toggle of their own — they're the addon's baseline behaviour,
--- governed by the master switch above.
 
 local function ApplyDefaults()
     HowRareDB = HowRareDB or {}
+    -- The screenshot option grew from a checkbox into a mode dropdown; carry an old
+    -- boolean forward rather than silently resetting the user's choice.
+    if type(HowRareDB.screenshot) == "boolean" then
+        HowRareDB.screenshot = HowRareDB.screenshot and "all" or "off"
+    end
     for key, value in pairs(DEFAULTS) do
         if HowRareDB[key] == nil then
             HowRareDB[key] = value
@@ -58,7 +63,28 @@ local function RegisterSettings()
         G.ApplyToastMode()
     end)
 
-    local toast, toastInit = AddCheckbox("toast", "Earned toast",
+    -- Per-surface switches, nested under the master: each automatic surface can be
+    -- turned off alone (chat enrichment is the classic "love the tooltips, hate the
+    -- noise" case). Read at use-time (G.SurfaceOn), so only the panel paint needs a
+    -- repaint callback to update already-visible rows.
+    local _, tooltipInit = AddCheckbox("tooltip", "Rarity on tooltips",
+        "Add each achievement's rarity — and, when you were notably early, your \"first N%\" rank — to achievement tooltips. Hold Shift while hovering for detail: tier, every region, and your earn date.")
+    DependOn(tooltipInit, masterInit, MasterOn)
+
+    local _, chatInit = AddCheckbox("chat", "Rarity on chat announcements",
+        "Append rarity to guild and nearby achievement announcements, plus whether you already have it — and how early you earned it, when you were notably early.")
+    DependOn(chatInit, masterInit, MasterOn)
+
+    local _, panelInit = AddCheckbox("panel", "Rarity % on achievement rows",
+        "Paint every achievement-panel row with its rarity %, so you can browse by rarity while scrolling.")
+    DependOn(panelInit, masterInit, MasterOn)
+    Settings.SetOnValueChangedCallback("HOWRARE_PANEL", function()
+        if G.RepaintRows then
+            G.RepaintRows()
+        end
+    end)
+
+    local _, toastInit = AddCheckbox("toast", "Earned toast",
         "Replace Blizzard's achievement alert with a toast that adds the achievement's rarity. Turn off to restore Blizzard's own alert.")
     DependOn(toastInit, masterInit, MasterOn)
     -- Suppress / restore Blizzard's own achievement alert the moment this flips.
@@ -66,12 +92,23 @@ local function RegisterSettings()
         G.ApplyToastMode()
     end)
 
-    -- Nested under the toast (and the master): a screenshot needs a toast to catch.
-    local _, shotInit = AddCheckbox("screenshot", "Screenshot earned achievements",
-        "Take a screenshot when you earn an achievement, capturing the toast over your screen — no UI hidden. Each toast in a multi-achievement earn is caught in turn. Needs the earned toast on.")
-    DependOn(shotInit, toastInit, function()
-        return MasterOn() and toast:GetValue()
-    end)
+    -- Auto-screenshot as a mode, not a checkbox: "rare earns" is the middle setting
+    -- that keeps the shots worth keeping without filling the folder — the tier is the
+    -- addon's own judgment of "worth a screenshot". Conceptually under the toast (a
+    -- screenshot needs a toast to catch), but dropdowns don't nest, so the tooltip
+    -- says so instead.
+    local shotSetting = Settings.RegisterAddOnSetting(
+        category, "HOWRARE_SCREENSHOT", "screenshot", HowRareDB,
+        Settings.VarType.String, "Screenshot earned achievements", DEFAULTS.screenshot)
+    if Settings.CreateDropdown then
+        Settings.CreateDropdown(category, shotSetting, function()
+            local container = Settings.CreateControlTextContainer()
+            container:Add("off", "Off", "Never screenshot automatically.")
+            container:Add("rare", "Rare earns", "Screenshot earns of rare, epic, and legendary tier — the ones worth keeping.")
+            container:Add("all", "All earns", "Screenshot every achievement earn.")
+            return container:GetData()
+        end, "Take a screenshot when you earn an achievement, capturing the toast over your screen — no UI hidden. Each toast in a multi-achievement earn is caught in turn. Needs the earned toast on.")
+    end
 
     -- Tier-colouring of the panel-row titles (on by default). Nested under the
     -- master switch.
@@ -139,12 +176,15 @@ local function RegisterSettings()
         end
     end)
 
-    -- The rarity "about" section: what the number means, the live denominator + scope,
-    -- the snapshot date (a release IS a data refresh), and the data attribution. The
-    -- user opted into this page, so it's the home for the fuller "by the Wizzleworks"
-    -- credit. The explanation names the account count, not the brand. A "How the
-    -- numbers work" link is deferred until the funnel/hub lands (it'll ride the rarity-
-    -- library split) — see HANDOVER.
+    -- The rarity "about" section: what the two numbers mean, the live denominator +
+    -- snapshot date, and the data attribution. The user opted into this page, so it's
+    -- the home for the wizzleworks credit — the lowercase display wordmark in brand
+    -- gold (like the site's "gratz!", the stylised form is for display surfaces;
+    -- running prose keeps "the Wizzleworks"). One compact small-font paragraph via
+    -- our own element template (OptionsAbout.xml + HowRareAboutMixin below): stock
+    -- section headers are 45px each and don't wrap, so line-per-header scrolled the
+    -- panel. Guarded like the other optional Settings APIs; the fallback is a single
+    -- credit header, not the full text.
     local accounts = G.AR:GetMeta().accounts
     local scope
     if G.region == "global" then
@@ -154,14 +194,20 @@ local function RegisterSettings()
         scope = string.format("%s active %s accounts",
             BreakUpLargeNumbers(accounts[G.region]), G.region:upper())
     end
-    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
-        "Rarity is the share of active accounts that have earned an achievement"))
-    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
-        string.format("Measured across %s", scope)))
-    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
-        string.format("Data snapshot: %s", G.AsOfLong())))
-    layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
-        "Data generated by the Wizzleworks"))
+    local about = table.concat({
+        "Rarity is the share of active accounts that hold an achievement.",
+        "\"First N%\" is how early you earned it — shown when you were notably early.",
+        string.format("Measured across %s · snapshot %s.", scope, G.AsOfLong()),
+        "", -- blank line sets the credit off from the methodology
+        "Data by |cffffd100wizzleworks|r",
+    }, "\n")
+    if Settings.CreateElementInitializer then
+        layout:AddInitializer(Settings.CreateElementInitializer(
+            "HowRareAboutTemplate", { text = about }))
+    else
+        layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(
+            "Data by |cffffd100wizzleworks|r"))
+    end
 
     Settings.RegisterAddOnCategory(category)
 end
@@ -171,7 +217,14 @@ loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", function(self, event, loadedName)
     if event == "PLAYER_LOGIN" then
-        G.Print(string.format("loaded (as of %s) — /howrare for options", G.AsOfLong()))
+        -- Staleness nudge: freshness is the product promise, so an aging embedded
+        -- snapshot is flagged rather than silently presented as current. 60 days ≈
+        -- two refresh cadences missed.
+        local age = G.SnapshotAgeDays()
+        local stale = (age and age > 60)
+            and string.format(" — snapshot ~%d months old; a newer release may have fresher data", math.floor(age / 30))
+            or ""
+        G.Print(string.format("loaded (as of %s%s) — /howrare for options", G.AsOfLong(), stale))
         return
     end
     if loadedName ~= addonName then
@@ -181,6 +234,17 @@ loader:SetScript("OnEvent", function(self, event, loadedName)
     ApplyDefaults()
     RegisterSettings()
 end)
+
+-- The about block's element mixin (template: OptionsAbout.xml, instantiated by the
+-- settings list when the page opens). Global — the XML template resolves the mixin
+-- by name at instantiation. The settings scroll factory calls frame:Init(initializer)
+-- (ScrollBoxFactoryInitializerMixin.InitFrame); the element's height comes from the
+-- template, so this only fills the text.
+HowRareAboutMixin = {}
+
+function HowRareAboutMixin:Init(initializer)
+    self.Text:SetText(initializer:GetData().text)
+end
 
 local function OpenOptions()
     Settings.OpenToCategory(G.settingsCategory:GetID())
@@ -196,6 +260,8 @@ local function PrintStatus()
     for key, value in pairs(HowRareDB) do
         if type(value) == "boolean" then
             opts[#opts + 1] = key .. "=" .. (value and "on" or "off")
+        elseif type(value) == "string" then
+            opts[#opts + 1] = key .. "=" .. value
         end
     end
     table.sort(opts)
@@ -207,6 +273,92 @@ local function PrintStatus()
     print("  options: " .. table.concat(opts, " "))
     print("  achievement UI hooks: " .. (G.achievementUIHooked and "installed" or "waiting (panel not opened yet)"))
     print("  Lua errors are hidden unless: /console scriptErrors 1 (or install BugSack)")
+end
+
+-- /howrare top [n] — your rarest earned achievements, rarest first, as hoverable
+-- links (each link shows the full tooltip, rank line included, so the list doubles
+-- as a browser). Fine-formatted %s: a top list clamped to "<1%" would read as ties
+-- exactly where it's most interesting. The scan is the shared G.EarnedRarities
+-- (cold-path, sorted rarest-first).
+local TOP_MAX = 25
+local function PrintTop(rest)
+    local n = math.min(tonumber(rest and rest:match("%d+")) or 10, TOP_MAX)
+    local earned = G.EarnedRarities()
+    if #earned == 0 then
+        G.Print("no earned achievements in this data snapshot yet.")
+        return
+    end
+    G.Print(string.format("your %d rarest (of %s earned in the snapshot):",
+        math.min(n, #earned), BreakUpLargeNumbers(#earned)))
+    for i = 1, math.min(n, #earned) do
+        local e = earned[i]
+        local rank = G.RankPhrase(e.id)
+        print(string.format("  %d. %s |cff%s%s|r%s", i, GetAchievementLink(e.id) or "?",
+            G.RarityHex(e.id), G.FormatPctFine(e.val),
+            rank and (" |cffffffff· " .. rank .. "|r") or ""))
+    end
+end
+
+-- /howrare why <achievement link or id> — the full story for one achievement: its
+-- rarity, count, tier, your earn, your rank, and exactly which rule shows or hides
+-- each line. The gates are deliberate but invisible, and an enthusiast testing their
+-- proudest earn otherwise can't tell "suppressed" from "broken" — this makes every
+-- suppression inspectable (and exercises the whole library surface, fitting the
+-- reference-consumer job). Shift-click an achievement to insert its link.
+local function ExplainWhy(rest)
+    local id = tonumber((rest or ""):match("|Hachievement:(%d+)") or (rest or ""):match("^%s*(%d+)%s*$"))
+    if not id then
+        G.Print("usage: /howrare why <achievement link or id> — shift-click an achievement to insert its link.")
+        return
+    end
+    local name = G.AchievementInfo(id)
+    G.Print("why: " .. (name and GetAchievementLink(id) or ("achievement " .. id)))
+    if not name then
+        print("  this game client doesn't know that achievement id — nothing can be looked up.")
+        return
+    end
+    local pct = G.RarityValue(id)
+    if not pct then
+        print("  not in this data snapshot (newer than its as-of date) — no rarity, no rank.")
+        return
+    end
+    local region = G.ScopeRegion()
+    local meta = G.AR:GetMeta()
+    print(string.format("  rarity: |cff%s%s|r — one of ~%s of %s active accounts (%s scope) · tier %s",
+        G.RarityHex(id), G.FormatPctFine(pct), BreakUpLargeNumbers(G.AR:GetCount(id)),
+        BreakUpLargeNumbers(meta.accounts[region]),
+        region == "global" and "global" or region:upper(), G.RarityTier(id) or "?"))
+    if not G.SelfCompleted(id) then
+        print("  you haven't earned it — rank lines only ever describe your own earn.")
+        return
+    end
+    local earnedShort = G.AchievementEarnedShort(id)
+    local ago = G.EarnedAgo(id)
+    print(string.format("  earned: %s%s", earnedShort or "date unknown",
+        ago and (" (" .. ago .. ")") or ""))
+    if not G.AchievementEarnedTime(id) then
+        print("  the game records no usable earn date for it — rank suppressed.")
+        return
+    end
+    -- Second return: the earner percentile on success, the library's suppression
+    -- reason ("no-curve" / "date-floor"; "off-snapshot" was ruled out above) on nil.
+    local rankAll, earnerPct = G.RankAtEarn(id)
+    if not rankAll then
+        if earnerPct == "date-floor" then
+            print(string.format("  your recorded earn date is at or before the achievement system's launch (%s) — the game back-credits old account-wide earns there, so the date is unreliable. rank suppressed.",
+                meta.rankFloor or "2008-10-14"))
+        else
+            print("  no rank curve for it in this scope — too few tracked earners for a stable percentile. rank suppressed.")
+        end
+        return
+    end
+    print(string.format("  rank: you were earlier than ~%d%% of its earners → in the first %s of all tracked accounts.",
+        math.floor(earnerPct + 0.5), G.FormatPctFine(rankAll)))
+    if earnerPct > G.RANK_EARLY_MAX then
+        print(string.format("  display: suppressed — not notably early. The line shows when you're in the first %d%% of earners; later than that it would only restate the rarity.", G.RANK_EARLY_MAX))
+    else
+        print("  display: shows on the tooltip, chat, and toast as \"you were in the " .. G.RankPhrase(id) .. " to earn this\".")
+    end
 end
 
 -- Keybinding label for the WoW Key Bindings screen. The action is declared in
@@ -223,6 +375,10 @@ SlashCmdList.HOWRARE = function(msg)
     cmd = cmd:lower()
     if cmd == "status" then
         PrintStatus()
+    elseif cmd == "top" then
+        PrintTop(rest)
+    elseif cmd == "why" then
+        ExplainWhy(rest)
     elseif cmd == "toast" then
         G.DebugToast(rest)
     elseif cmd == "share" then

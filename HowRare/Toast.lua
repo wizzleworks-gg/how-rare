@@ -170,6 +170,17 @@ local function CreateToastFrame(index)
     f.stamp = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.stamp:SetPoint("TOPLEFT", f.rarityPre, "BOTTOMLEFT", 0, -LINE_GAP - 2)
 
+    -- The card's one piece of identity: a small brand-gold "How Rare?" in the footer's
+    -- right corner. The toast is the addon's only surface that travels — it's built to
+    -- be screenshotted, and screenshots reach non-users — so unlike every other
+    -- (deliberately brand-silent) surface it must answer "what addon is that?", or the
+    -- share loop dead-ends at its last step. Anchored to the card corner; the y offset
+    -- eyeballs the stamp row's baseline (tune in-game if it sits off the row).
+    f.brand = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f.brand:SetPoint("BOTTOMRIGHT", -EDGE_INSET, 24)
+    f.brand:SetText("How Rare?")
+    f.brand:SetTextColor(unpack(G.GOLD))
+
     -- Glow flashes behind the text (sublevel below it, so it brightens without
     -- washing it); the shine sweeps across in front. Both reuse Blizzard's atlas;
     -- the sizes and sweep distance are fitted to our frame by eye. Start invisible.
@@ -185,7 +196,16 @@ local function CreateToastFrame(index)
     gi:SetFromAlpha(0); gi:SetToAlpha(1); gi:SetDuration(0.2); gi:SetOrder(1)
     local go = f.glowAnim:CreateAnimation("Alpha")
     go:SetFromAlpha(1); go:SetToAlpha(0); go:SetDuration(0.5); go:SetOrder(2)
-    f.glowAnim:SetScript("OnFinished", function() f.glow:SetAlpha(0) end)
+    -- Chained re-play gives the multi-pulse celebration (fxPulsesLeft is set by
+    -- PlayEffects from the earn's tier); the final pulse parks the glow invisible.
+    f.glowAnim:SetScript("OnFinished", function()
+        if f.fxPulsesLeft and f.fxPulsesLeft > 0 then
+            f.fxPulsesLeft = f.fxPulsesLeft - 1
+            f.glowAnim:Play()
+        else
+            f.glow:SetAlpha(0)
+        end
+    end)
 
     f.shine = f:CreateTexture(nil, "OVERLAY", nil, 7)
     f.shine:SetTexture(TOAST_ART)
@@ -204,6 +224,10 @@ local function CreateToastFrame(index)
     f.shineAnim:SetScript("OnFinished", function() f.shine:SetAlpha(0) end)
 
     function f.PlayEffects()
+        -- Tier-scaled celebration (Populate sets fxR/G/B + fxPulses from the earn's
+        -- tier): the flourish grows with exactly the thing the addon celebrates.
+        f.shine:SetVertexColor(f.fxR or 1, f.fxG or 1, f.fxB or 1)
+        f.fxPulsesLeft = (f.fxPulses or 1) - 1
         f.glow:SetAlpha(0); f.glowAnim:Stop(); f.glowAnim:Play()
         f.shine:SetAlpha(0); f.shineAnim:Stop(); f.shineAnim:Play()
     end
@@ -308,14 +332,37 @@ local function Populate(f, achievementId)
     f.rarityPre:SetText(pre)
     f.rarityTilde:SetText(tilde)
     f.rarityPost:SetText(post)
-    -- Two clearly-separated dates: when you earned it (the client's real
-    -- completion date — today for a live earn, the true past date for a re-share
-    -- via /howrare share) and that the rarity figure is the current snapshot's, not
-    -- the rarity back when you earned it. The earn date is dropped when unknown
-    -- (e.g. an unearned preview), leaving just the rarity's as-of.
+    -- Tier-scaled celebration parameters (PlayEffects reads them): the rarer the earn,
+    -- the bigger the moment — notable tiers (IsRareTier, the same boundary the "rare"
+    -- screenshot mode uses) tint the sweep in their tier colour, epic pulses the glow
+    -- twice, legendary three times. Sub-rare tiers (and off-snapshot) keep the stock
+    -- single white flourish.
+    local notable, tier = G.IsRareTier(achievementId)
+    if notable then
+        f.fxR, f.fxG, f.fxB = G.RarityColor(achievementId)
+        f.fxPulses = tier == "legendary" and 3 or tier == "epic" and 2 or 1
+    else
+        f.fxR, f.fxG, f.fxB = 1, 1, 1
+        f.fxPulses = 1
+    end
+    -- The footer row. Default: when you earned it (the client's real completion date)
+    -- · that the rarity figure is the current snapshot's, not the rarity back then.
+    -- But on a /howrare share of an OLD earn the rank-at-earn is the brag — the
+    -- current-rarity headline above understates an achievement everyone's had years to
+    -- get — so it rides the earn-date row it derives from, in brand gold, replacing the
+    -- as-of note (the earn date already dates the card). A live earn's rank is ~100%
+    -- → RankPhrase nil → the default as-of form, so this is data-driven, not path-keyed.
+    -- The earn date is dropped when unknown (e.g. an unearned preview).
     local earned = G.AchievementEarnedShort(achievementId)
-    local asOf = "Rarity as of " .. G.AsOfShort()
-    f.stamp:SetText(earned and (string.format("Earned %s  ·  %s", earned, asOf)) or asOf)
+    local rank = G.RankPhrase(achievementId)
+    if rank then
+        f.stamp:SetText(earned
+            and string.format("Earned %s  ·  |cffffd100%s|r", earned, rank)
+            or string.format("|cffffd100%s|r", rank))
+    else
+        local asOf = "Rarity as of " .. G.AsOfShort()
+        f.stamp:SetText(earned and (string.format("Earned %s  ·  %s", earned, asOf)) or asOf)
+    end
     return true
 end
 
@@ -436,13 +483,36 @@ local function DebugIds()
     return rare
 end
 
--- The toast to pin for a clean showcase / screenshot: the rarest client-known
--- achievement (across the whole snapshot) whose name fits the card at full size,
--- so the rarity reads impressively without the name shrinking or truncating.
--- "Fits" is approximated by name length (rendered width isn't measured here);
--- falls back to the rarest known if none clear the budget.
+-- The toast to pin for a clean showcase / screenshot: YOUR rarest earned
+-- achievement whose name fits the card at full size, so the card carries the real
+-- earn-date footer (and the rank-at-earn brag when your earn clears its gates) —
+-- a pinned card of someone else's achievement can't show either. Walks the shared
+-- rarest-first earned scan (G.EarnedRarities), so preference-within-class is just
+-- first-hit order: rank-braggable + fits, then fits, then any earned. Only when
+-- nothing of yours is in the snapshot does it fall back to the old rarest
+-- client-known showcase. "Fits" is approximated by name length (rendered width
+-- isn't measured here); RankPhrase is only probed for fitting ids.
 local SHOWCASE_NAME_MAX = 22
 local function ShowcaseId()
+    local fitsBest, anyBest
+    for _, e in ipairs(G.EarnedRarities()) do
+        local name = G.AchievementInfo(e.id)
+        local fits = name and #name <= SHOWCASE_NAME_MAX
+        if fits and G.RankPhrase(e.id) then
+            return e.id
+        end
+        if fits and not fitsBest then
+            fitsBest = e.id
+        end
+        if name and not anyBest then
+            anyBest = e.id
+        end
+    end
+    if fitsBest or anyBest then
+        return fitsBest or anyBest
+    end
+    -- Nothing earned in the snapshot: the rarest client-known achievement whose
+    -- name fits, else the rarest known at all.
     local best, bestVal, fallback, fallbackVal
     for id in pairs(G.AR:GetData()) do
         local name = G.AchievementInfo(id)
@@ -496,8 +566,9 @@ end
 
 -- Debug: /howrare toast pin — show one toast that does NOT fade, with Replay/Close
 -- buttons beneath it, so the card can be studied or screenshotted at leisure. Uses
--- the rarest achievement whose name fits, so the pinned toast reads as an
--- impressive, well-fitting earn. Holds slot 1 until you Close it.
+-- your rarest earned achievement whose name fits (ShowcaseId), so the pinned card
+-- shows the real footer — earn date, and the rank brag when it applies. Holds
+-- slot 1 until you Close it.
 local function DebugPin()
     local f = ShowSample(ShowcaseId())
     if not f then
@@ -620,7 +691,7 @@ function G.ApplyToastMode()
     if not AlertFrame then
         return
     end
-    if G.IsEnabled() and HowRareDB.toast then
+    if G.SurfaceOn("toast") then
         AlertFrame:UnregisterEvent("ACHIEVEMENT_EARNED")
     else
         AlertFrame:RegisterEvent("ACHIEVEMENT_EARNED")
@@ -638,8 +709,8 @@ events:SetScript("OnEvent", function(_, event, achievementId)
         G.ApplyToastMode()
         return
     end
-    if not G.IsEnabled() or not HowRareDB.toast then
+    if not G.SurfaceOn("toast") then
         return
     end
-    ShowToast(achievementId, HowRareDB.screenshot)
+    ShowToast(achievementId, G.ScreenshotWanted(achievementId))
 end)

@@ -51,22 +51,28 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
 
 - SavedVariables table: `HowRareDB`. Global debug handle: `HowRare` (e.g.
   `/dump HowRare.AR:GetMeta()`, or `/dump LibStub("AchievementRarity-1.0"):GetMeta()`).
-- Slash: `/howrare` and `/hr` (`status`, `toast [n|pin]`, `share`, `debug`; bare
-  opens options).
+- Slash: `/howrare` and `/hr` (`status`, `top [n]`, `why <link|id>`, `toast [n|pin]`,
+  `share`, `debug`; bare opens options).
 - **Naming: brand headline "How Rare?", descriptive subtitle for discovery,
   the Wizzleworks as data attribution.** The CurseForge/TOC title is **"How Rare? —
   Achievement Rarity"**: "How Rare?" is the brand (and the question a player asks on
   hover), and "Achievement Rarity" rides along as the searchable phrase (CurseForge
   indexes the Name/Summary, not the folder/repo). The runtime surfaces themselves
-  stay **functional and brand-silent**: the tooltip reads `Rarity: 3%`, the panel a
-  bare `%`, the chat tag `(rarity 3%)`, and the toast carries no brand — none of them
-  advertise. **the Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
+  stay **functional and brand-silent** — the tooltip reads `Rarity: 3%`, the panel a
+  bare `%`, the chat tag `· rarity 3%` — with **one deliberate exception: the toast
+  carries a small brand-gold "How Rare?" mark**, because it is the one surface built
+  to travel (screenshots reach non-users) and an unmarked screenshot can't answer
+  "what addon is that?" — the growth loop's last step (matches the architecture doc's
+  §11 attribution table: toast = the highest-ROI credit surface). No other surface
+  advertises. **the Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
   separate website product, *not* the data owner — see
   `gratz-addon/docs/rarity-data-library.md`), credited only where someone asks
-  "where's this from?": the options page (the fuller attribution there is pending —
-  the §4 options-copy pass). The internal identity is `HowRare` (folder, `HowRareDB`,
-  globals); the slash stays the functional `/howrare`. See §11 of the architecture
-  doc.
+  "where's this from?": the options page's about block ("Data by wizzleworks"). The
+  wordmark follows the family convention set by "gratz!": **display surfaces show the
+  stylised lowercase "wizzleworks"** (in brand gold, `ffd100`); **running prose keeps
+  "the Wizzleworks"** (READMEs, LICENSE, docs). The internal identity is `HowRare`
+  (folder, `HowRareDB`, globals); the slash stays the functional `/howrare`. See §11
+  of the architecture doc.
 - Interface colours: rarity tiers (defined in the embedded library) reuse
   `ITEM_QUALITY_COLORS` (loot-quality bands); the one brand gold is `ffd100`
   (`G.GOLD`) — How Rare?'s own, used for attribution and the off-snapshot fallback

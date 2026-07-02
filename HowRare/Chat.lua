@@ -5,7 +5,7 @@ local _, G = ...
 -- The chat frame format()s the message AFTER filters run (the %s player-name
 -- placeholder is still unfilled here), so any % we append must be escaped.
 local function FilterAchievementAnnounce(_, _, msg, author, ...)
-    if not G.IsEnabled() then
+    if not G.SurfaceOn("chat") then
         return false
     end
     local idStr = msg:match("|Hachievement:(%d+)")
@@ -17,9 +17,30 @@ local function FilterAchievementAnnounce(_, _, msg, author, ...)
     if not rarity then
         return false
     end
-    -- The % takes its rarity-tier colour; "(rarity …)" is white.
-    local suffix = string.format(" |cffffffff(rarity |r|cff%s%s|r|cffffffff)|r",
+    -- Appended beats are chained with middle dots (no brackets — they read as an
+    -- aside; the dot chain reads as one enriched line). The % takes its rarity-tier
+    -- colour; the "· rarity" lead-in is white like the other separators.
+    local suffix = string.format(" |cffffffff· rarity|r |cff%s%s|r",
         G.RarityHex(id), rarity)
+    -- Your own status on their announcement (not the linker's — a link carries no earn
+    -- data): the ready-check tick/cross for whether you hold it, and — when you do and
+    -- you were notably early — when you earned it and your rank then. Textures, not ✓/✗
+    -- characters: WoW's fonts have no glyph for those, so they render as a missing-glyph
+    -- box; :0 sizes the icon to the line height. This filter runs per announcement, so
+    -- the earn date is derived once and threaded into both beats. RankPhrase gates
+    -- off-snapshot / earner-floor / unreliable-date / not-notably-early, so the
+    -- "ago · rank" beat only ever rides a usable rank; EarnedAgo is then known to be a
+    -- good date.
+    if G.SelfCompleted(id) then
+        suffix = suffix .. " |TInterface\\RaidFrame\\ReadyCheck-Ready:0|t"
+        local earnTime = G.AchievementEarnedTime(id)
+        local rank = earnTime and G.RankPhrase(id, nil, earnTime)
+        if rank then
+            suffix = suffix .. string.format(" |cffffffff· %s · %s|r", G.EarnedAgo(id, earnTime), rank)
+        end
+    else
+        suffix = suffix .. " |TInterface\\RaidFrame\\ReadyCheck-NotReady:0|t"
+    end
     return false, msg .. suffix:gsub("%%", "%%%%"), author, ...
 end
 
@@ -39,6 +60,6 @@ hooksecurefunc("SetItemRef", function(link)
     end
     local id = tonumber(link and link:match("^achievement:(%d+)"))
     if id and G.RarityValue(id) then
-        G.ShowToast(id, HowRareDB.screenshot)
+        G.ShowToast(id, G.ScreenshotWanted(id))
     end
 end)

@@ -47,6 +47,15 @@ function G.IsEnabled()
     return HowRareDB ~= nil and HowRareDB.enabled ~= false
 end
 
+-- Whether an automatic surface is on: the master switch plus the surface's own
+-- toggle (key: "tooltip" / "chat" / "panel" / "toast" in HowRareDB, default on).
+-- Read at use-time by each surface, so flipping an option needs no re-hooking. A
+-- missing key reads as on — defaults are only written at ADDON_LOADED, and
+-- IsEnabled already guards the not-yet-loaded window.
+function G.SurfaceOn(key)
+    return G.IsEnabled() and HowRareDB[key] ~= false
+end
+
 -- True when the user's chosen click-to-preview modifier (HowRareDB.previewModifier:
 -- "alt"/"ctrl", or "off") is the only modifier held — isolating the gesture from
 -- Blizzard's own modified-clicks (shift links an achievement into chat). Shared by
@@ -133,6 +142,18 @@ function G.AsOfShort()
     return AR:GetMeta().asOf or ""
 end
 
+-- Age of the loaded snapshot in whole days, or nil if the as-of date is
+-- unparseable. The login line uses it to flag staleness — freshness is a rarity
+-- product's core promise, so an aging embed deserves a quiet nudge toward a newer
+-- release rather than silently presenting old numbers as current.
+function G.SnapshotAgeDays()
+    local y, m, d = SnapshotYMD()
+    if not y then
+        return nil
+    end
+    return math.max(0, math.floor((time() - time({ year = y, month = m, day = d })) / 86400))
+end
+
 -- The date an achievement was earned, as "18 Jun 26", or nil if it isn't
 -- completed (or is unknown to this client build). The client records the real
 -- completion date, so this is the true earn date even for an achievement earned
@@ -149,6 +170,48 @@ function G.AchievementEarnedShort(id)
         return nil
     end
     return string.format("%d %s %02d", day, m, year % 100)
+end
+
+-- The player's own earn date as epoch seconds, or nil when the achievement isn't
+-- completed (or the id is unknown to this client build, or the date is absent). The
+-- single earn-date-to-time source RankAtEarn and EarnedAgo both build on, so the
+-- date extraction lives once. pcall: GetAchievementInfo hard-errors on ids unknown
+-- to this client build. The year is 2-digit on some builds, full on others (mirrors
+-- AchievementEarnedShort's year % 100); time{} needs a full year.
+function G.AchievementEarnedTime(id)
+    local ok, _, _, _, completed, month, day, year = pcall(GetAchievementInfo, id)
+    if not ok or not completed or not month or month == 0 then
+        return nil
+    end
+    local fullYear = year < 100 and (2000 + year) or year
+    return time({ year = fullYear, month = month, day = day })
+end
+
+-- The player's own earn date as a rough relative span — "~3 weeks ago", "~6 months
+-- ago", "~2 years ago" — or nil when not completed. Coarse by design (the chat beat
+-- wants the gist, not a precise date), bucketing to days/weeks/months/years. Callers
+-- pair it with RankPhrase, which already suppresses the unreliable-date floor, so
+-- this doesn't re-check it. earnTime (optional) skips the re-derivation when the
+-- caller already extracted the earn date — the chat filter runs per announcement,
+-- so it derives once and threads it through here and RankPhrase.
+function G.EarnedAgo(id, earnTime)
+    earnTime = earnTime or G.AchievementEarnedTime(id)
+    if not earnTime then
+        return nil
+    end
+    local days = math.max(0, math.floor((time() - earnTime) / 86400))
+    if days < 1 then
+        return "~today"
+    elseif days < 14 then
+        return string.format("~%d day%s ago", days, days == 1 and "" or "s")
+    elseif days < 56 then
+        return string.format("~%d weeks ago", math.floor(days / 7))
+    elseif days < 730 then
+        local mo = math.floor(days / 30)
+        return string.format("~%d month%s ago", mo, mo == 1 and "" or "s")
+    else
+        return string.format("~%d years ago", math.floor(days / 365))
+    end
 end
 
 -- The rarity line's "Rarity:" label ink — white, so only the % carries the tier
@@ -196,31 +259,66 @@ function G.FormatPct(pct)
     return AR:FormatPct(pct)
 end
 
+-- Fine-grained % for the surfaces that live at the rare end (the rank phrase, the
+-- top list, the shift-detail view): whole percents at/above 1%, one decimal down to
+-- 0.1%, "<0.1%" below. The site-convention FormatPct clamps everything under 1% to
+-- "<1%" — right for browse surfaces, but it erases 1-in-110 vs 1-in-10,000 exactly
+-- where this product is most interesting.
+function G.FormatPctFine(pct)
+    if pct >= 0.95 then
+        return math.floor(pct + 0.5) .. "%"
+    elseif pct >= 0.095 then
+        return string.format("%.1f%%", pct)
+    end
+    return "<0.1%"
+end
+
 -- The attainment as a raw percent (0–100) under a scope (default: the user's saved
 -- scope), or nil when the achievement isn't in the library's snapshot.
 function G.RarityValue(achievementId, scope)
     return AR:GetRarity(achievementId, scope or G.Scope())
 end
 
--- Your rank-at-earn percentile (0–100) for an achievement under a scope (default: the
--- saved scope) — "you were in the first N% of holders to earn this" — or nil when not
--- completed, off-snapshot, below the scope's holder floor, or the recorded earn date is
--- unreliable (at/below the system-launch floor; the library suppresses it). Reads the
--- player's OWN recorded earn date (month/day/year from GetAchievementInfo, like
--- AchievementEarnedShort), so it's retroactive — it works for achievements earned long
--- before How Rare? was installed. pcall: GetAchievementInfo hard-errors on ids unknown to
--- this client build. The library owns the interpolation + floor; this just sources the
--- date. (Wording/surfacing is a later track — this is the value, unformatted.)
-function G.RankAtEarn(achievementId, scope)
-    local ok, _, _, _, completed, month, day, year = pcall(GetAchievementInfo, achievementId)
-    if not ok or not completed or not month or month == 0 then
+-- Your rank-at-earn for an achievement under a scope (default: the saved scope), as
+-- TWO returns straight from the library: the share (0–100) of ALL tracked accounts
+-- that earned it before you (the headline number — same denominator as the rarity %,
+-- so the two read consistently side by side), and your percentile among its earners
+-- only (the gate signal: were you notably early?). nil when not completed; on a
+-- library suppression the second return is the library's reason ("off-snapshot" /
+-- "no-curve" / "date-floor" — /howrare why reads it). Reads the player's OWN recorded
+-- earn date (via AchievementEarnedTime, or the optional pre-derived earnTime), so
+-- it's retroactive — it works for achievements earned long before How Rare? was
+-- installed. The library owns the interpolation + floor; this just sources the date.
+-- (Raw values; the formatted brag is RankPhrase.)
+function G.RankAtEarn(achievementId, scope, earnTime)
+    earnTime = earnTime or G.AchievementEarnedTime(achievementId)
+    if not earnTime then
         return nil
     end
-    -- GetAchievementInfo's year is 2-digit on some builds, full on others (mirrors
-    -- AchievementEarnedShort's year % 100); time{} needs a full year.
-    local fullYear = year < 100 and (2000 + year) or year
-    local earnTime = time({ year = fullYear, month = month, day = day })
     return AR:RankAtEarn(achievementId, earnTime, scope or G.Scope())
+end
+
+-- The rank line's job is to say something the rarity line doesn't already say. For a
+-- late earner the two collapse — the last earner's "first N%" IS the rarity — so the
+-- phrase only shows when you were earlier than this share of the achievement's
+-- earners. A redundancy gate, not an embarrassment gate: since the metric is measured
+-- against all accounts it is always honest; late earns just add nothing. Exposed on G
+-- so the /howrare why report can explain a suppression with the real number.
+G.RANK_EARLY_MAX = 75
+
+-- The rank-at-earn brag as a ready phrase — "first 3%", "first 0.4%" — or nil when
+-- there's no usable rank (RankAtEarn nil) or you weren't notably early among the
+-- achievement's earners (RANK_EARLY_MAX). The one shared wording + threshold source:
+-- every surface composes its line from this, so the phrasing and the gate can't drift
+-- between tooltip, chat, and toast. Fine-formatted: rank values live at the rare end,
+-- where "<1%" would flatten real differences. earnTime (optional) threads a caller's
+-- already-derived earn date through, like EarnedAgo.
+function G.RankPhrase(achievementId, scope, earnTime)
+    local pct, earnerPct = G.RankAtEarn(achievementId, scope, earnTime)
+    if not pct or earnerPct > G.RANK_EARLY_MAX then
+        return nil
+    end
+    return "first " .. G.FormatPctFine(pct)
 end
 
 -- Formatted attainment ("3%", "<1%") under a scope, or nil off-snapshot.
@@ -279,27 +377,63 @@ function G.RarityTextAndColor(achievementId, scope)
     return text, r, g, b
 end
 
--- Your rarest *earned* achievement across the whole shipped rarity snapshot: of
--- every achievement the Wizzleworks ships a rarity for that you've completed, the one
--- with the lowest region attainment. Returns (name, formattedPct, id), or nil when
--- none of your earned achievements are in the snapshot. The id lets callers tint
--- the line by its rarity tier. Shared by the share keybind and the showcase toast.
--- SelfCompleted (a pcall'd GetAchievementInfo) is only tested when an id's rarity
--- beats the current best, so the per-id cost is a cheap table lookup and the
--- completion calls are bounded to genuine improvements, not the whole snapshot.
-function G.RarestEarned(scope)
-    local rarestId, rarestVal
+-- Whether an achievement's tier is "rare or rarer" — the addon's ONE judgment of
+-- which earns are notable (worth an auto-screenshot, worth the bigger toast
+-- celebration), held in a single predicate so the two can't drift apart. Returns
+-- the tier as a second value for callers that also need it (the toast derives its
+-- pulse count from it without a second lookup).
+function G.IsRareTier(achievementId, scope)
+    local tier = G.RarityTier(achievementId, scope)
+    return tier == "legendary" or tier == "epic" or tier == "rare", tier
+end
+
+-- Whether an earn/preview of this achievement should auto-screenshot, per the
+-- screenshot mode (HowRareDB.screenshot): "all" shoots every toast, "rare" only the
+-- rare-and-rarer tiers (IsRareTier — captures the brag shots without filling the
+-- folder), "off" never. The explicit share action bypasses this — asking for a
+-- share IS asking for the capture.
+function G.ScreenshotWanted(achievementId)
+    local mode = HowRareDB and HowRareDB.screenshot
+    if mode == "all" then
+        return true
+    end
+    if mode == "rare" then
+        return (G.IsRareTier(achievementId))
+    end
+    return false
+end
+
+-- Every earned achievement in the shipped snapshot with its rarity, sorted
+-- rarest-first ({ id, val } records). The ONE snapshot-wide earned scan — the share
+-- path reads [1], /howrare top prints the head, the showcase pin walks it for the
+-- best card — so the enumerate-filter loop lives once instead of three near-copies.
+-- Cold-path only: the full scan pcalls completion for every rarity-bearing id, fine
+-- for commands and debug tools, never for per-event surfaces.
+function G.EarnedRarities(scope)
+    local earned = {}
     for id in pairs(AR:GetData()) do
         local val = G.RarityValue(id, scope)
-        if val and (not rarestVal or val < rarestVal) and G.SelfCompleted(id) then
-            rarestVal, rarestId = val, id
+        if val and G.SelfCompleted(id) then
+            earned[#earned + 1] = { id = id, val = val }
         end
     end
-    if not rarestId then
+    table.sort(earned, function(a, b)
+        return a.val < b.val
+    end)
+    return earned
+end
+
+-- Your rarest *earned* achievement — EarnedRarities' head. Returns
+-- (name, formattedPct, id), or nil when none of your earned achievements are in
+-- the snapshot. The id lets callers tint the line by its rarity tier. Shared by
+-- the share keybind and the showcase toast.
+function G.RarestEarned(scope)
+    local e = G.EarnedRarities(scope)[1]
+    if not e then
         return nil
     end
-    local name = G.AchievementInfo(rarestId)
-    return name, G.FormatPct(rarestVal), rarestId
+    local name = G.AchievementInfo(e.id)
+    return name, G.FormatPct(e.val), e.id
 end
 
 -- Movable-frame position persistence — one saved shape ({point, relPoint,

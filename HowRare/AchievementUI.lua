@@ -59,7 +59,7 @@ local function PaintRarity(button)
         if rarity then
             button.HowRareText:SetTextColor(rr, rg, rb)
         end
-        button.HowRareText:SetText((G.IsEnabled() and rarity) or "")
+        button.HowRareText:SetText((G.SurfaceOn("panel") and rarity) or "")
     end
     PaintTitle(button, rarity, rr, rg, rb)
 end
@@ -80,7 +80,7 @@ local function HookRowClick(button)
         if mouseButton == "LeftButton" and G.IsEnabled() and G.PreviewModifierHeld()
             and G.RarityValue(self.id) then
             if not down then
-                G.ShowToast(self.id, HowRareDB.screenshot)
+                G.ShowToast(self.id, G.ScreenshotWanted(self.id))
             end
             return
         end

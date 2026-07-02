@@ -1,17 +1,102 @@
-# HANDOVER — How Rare? rarity-surface expansion (design revised 2026-06-29)
+# HANDOVER — How Rare? rarity-surface expansion (design revised 2026-07-02)
 
 **This theme:** grow where How Rare? surfaces rarity. A **rarity-at-earn foundation**
 (the *rank metric*, gratz-side) feeds **tooltip / chat / toast** surfaces, plus
 **rarity on dungeon/raid content** (Encounter Journal, map pins, Group Finder) as a
 separate track. All **in How Rare?** (the rarity layer). Design agreed 2026-06-28,
-**revised 2026-06-29** — the foundation changed from a client-side stamp to a
-gratz-side rank metric (see below). **Track 1 (the foundation) is BUILT + committed
-(2026-06-29); surfaces (Track 2) are next, instance rarity (Track 3) is its own session.**
+**revised 2026-06-29** (stamp → gratz-side rank metric) and **again 2026-07-02** (rank
+denominator re-based to all accounts + a full product re-evaluation build — see the
+amendment and SESSION STATE below). **Track 1 (the foundation) is BUILT + committed
+(2026-06-29, prod OOM fixed 2026-07-01); Track 2 (surfaces) + the re-evaluation set are
+BUILT, uncommitted, awaiting in-game verify (see SESSION STATE below); instance rarity
+(Track 3) is its own session.**
 
 Builds on the architecture doc (`../gratz-addon/docs/addon-architecture.md`): §6
 (rarity-at-earn), §7 (instance→achievement map), §3③ (the dropped instance-tooltips
 addon), §11 (naming / the toast as the outbound surface), and the reverted hover probe
 (`../gratz-addon/docs/dungeon-raid-hover-probe.md`).
+
+## SESSION STATE — 2026-07-03: re-evaluation build + simplify pass COMMITTED; NEXT is in-game verify
+
+The 2026-07-01 in-game test session found the rank metric's denominator flaw (see the
+foundation amendment below) and prompted a full product re-evaluation; the whole approved
+improvement set is **built, luac-clean, functionally tested outside WoW** (a stubbed-Lua
+harness verified the redefined metric against a hand-computed oracle, explicit-region
+scopes, and the suppression reasons), **cleaned by a 4-angle /simplify pass, and
+committed in both repos** (2026-07-03, user-approved). The simplify pass consolidated:
+one rare-tier predicate (screenshot mode + toast flourish share the boundary), one
+snapshot-wide earned scan (share / top / pin), explicit-region scopes in the library
+(consumers no longer index its packed triples), RankAtEarn nil-reasons ("off-snapshot" /
+"no-curve" / "date-floor" — /howrare why reads them instead of the library's tables),
+earn-date derivation threaded once through the hot chat/tooltip paths, and the toast on
+the shared per-surface gate.
+
+**Built this session (all uncommitted):**
+- **Rank metric re-based (library API half, `achievement-rarity` sibling + re-embedded):**
+  `RankAtEarn` now returns the share of ALL tracked accounts that earned it before you
+  (= earner-percentile × rarity; denominator-consistent with the rarity %, never exceeds
+  it) plus the earner-only percentile as a second return. `API_MINOR = 2`. Data file
+  unchanged (same curves, prod `asOf 2026-07-01`).
+- **Gate + formatting (Core):** the old 50%-of-earners flex cutoff is now a **redundancy
+  gate** `G.RANK_EARLY_MAX = 75` (the line shows when you're in the first 75% of earners;
+  later than that it would only restate the rarity — a live earn stays suppressed).
+  `G.FormatPctFine` (whole ≥1%, one decimal to 0.1%, "<0.1%" below) formats the rank and
+  the other rare-end surfaces; the site-convention FormatPct is unchanged elsewhere.
+- **Tooltip:** sub-1% rarity lines append the count ("(one of ~830)"); Shift-hover detail
+  view (tier name, US/EU/Global fine %s, your earn date + ago); per-surface toggle.
+- **Chat:** ✓/✗ replaced with the raid ready-check icon textures (WoW fonts have no ✓/✗
+  glyph — they rendered as coloured boxes in-game); per-surface toggle.
+- **Toast:** tier-scaled celebration (rare+ tiers tint the shine sweep in tier colour;
+  epic pulses the glow ×2, legendary ×3); small brand-gold **"How Rare?" mark** bottom-right
+  (the travelling-surface exception to brand silence — CLAUDE.md conventions updated);
+  screenshot became a **mode** (off / rare earns / all; old boolean saved-vars coerced);
+  `/howrare toast pin` now showcases YOUR rarest earned (rank-braggable + name-fits first).
+- **Options:** per-surface checkboxes (tooltip / chat / panel %), screenshot dropdown,
+  and a stale-snapshot nudge on the login line (>60 days old). The about block is ONE
+  compact small-font paragraph via our own settings-list element template
+  (`OptionsAbout.xml` + `HowRareAboutMixin`, TOC'd) — stock section headers are 45px
+  per line and don't wrap, so line-per-header truncated AND scrolled; the factory
+  contract (frame:Init(initializer), extent = template height) was verified against
+  Blizzard_SettingsList.lua / ScrollUtil.lua in the Gethe mirror. The credit is the
+  lowercase display wordmark in brand gold: "Data by wizzleworks" (running prose keeps
+  "the Wizzleworks" — convention recorded in CLAUDE.md).
+- **Chat separator:** the rarity tag lost its brackets — beats chain with middle dots
+  (`… · rarity 3% ✓ · ~2 years ago · first 0.4%`).
+- **Commands:** `/howrare top [n]` (your rarest earned as hoverable links, fine %s +
+  rank) and `/howrare why <link|id>` (full per-achievement story: rarity, count, tier,
+  your earn, your rank, and exactly which rule shows/suppresses each line).
+- **Docs updated for consistency:** both READMEs, both CHANGELOGs, how-rare CLAUDE.md
+  (brand exception + slash list). Deliberately NOT built (product boundaries): rarity
+  browser/sort UI (paint-and-glance altitude confirmed), realm scope, historical curves;
+  also skipped as needing live-client verification first: comparison-frame + guild-tab
+  painting, Krowi coexistence check.
+
+**NEXT — in-game verify (then commit):**
+1. `/reload`, then `/howrare why <shift-click an achievement link>` — the new
+   self-diagnosis; confirm its story matches what the surfaces show.
+2. Chat: broadcast → ready-check tick/cross icons (NOT coloured squares now) + "ago ·
+   first N%" on early-held earns.
+3. Tooltip: sub-1% count parenthetical; Shift-hover detail; rank line on early earns
+   ("first 0.x%" values now — much smaller than before, by design).
+4. Toast: `/howrare toast pin` (your earned card + rank row + brand mark placement —
+   the mark's y-offset is eyeballed, may need a nudge); tier-tinted shine / pulses via
+   `/howrare toast 3`; screenshot mode dropdown.
+5. `/howrare top` — the list + hoverable links.
+6. Judge the taste calls: RANK_EARLY_MAX=75, the "first 0.4%" wording, tint intensity.
+
+(Committed 2026-07-03 with the spurious `Libs/*` 100644→100755 mode flips reverted via
+chmod, so they never entered history. Anything the in-game verify shakes out lands as
+follow-up commits.)
+
+**gratz side — DONE + deployed, background only (NOT front-end work):** Track 1's rank pass
+was OOM-killing the prod counter (~6 GB); fixed and deployed across four gratz commits —
+`0ceda75` / `58e1788` / `87c5a9c` (the memory fix: isolate the rank histogram + malloc_trim
+the per-chunk churn) and `b5c7af0` (a 5 GB cgroup cap on the nightly counter so a future
+runaway kills the counter, not the web app). The nightly cron now populates the rank tables
+(verified 2026-07-01: 882K reps, 0 drift, ~3.35 GB peak — fine on the 7.75 GB box; the
+pre-floor date warning is a negligible stray). Full detail is in the gratz git log. The one
+carried-forward item is the publish AUTOMATION (auto export→push→re-embed), still deferred
+below — this session's export+embed was by hand. None of this concerns the front-end session.
 
 ## Previous theme — shipped
 
@@ -31,9 +116,22 @@ brand sweep (`gratz-addon@39d95d9`). Deferred loose ends carried at the bottom.
 > it" as historical truth. **Replaced by a gratz-side rank metric** that is
 > retroactive, honest, needs no stamp, and needs no SavedVariables.
 
-**The metric: "you were in the first N% to earn this"** — your rank among an
-achievement's holders, by earn date. A genuine flex on rare achievements ("first 2%"),
-and *nice-to-know* on common ones ("earlier than 60%"), so we ship it for everything.
+> **Design change 2026-07-02 — the denominator is ALL tracked accounts, not holders.**
+> In-game testing exposed the holders-only version as backwards: a mid-pack earner of a
+> top-4% achievement ranked "first 85%" *of a club 96% of players never joined* —
+> punishing exactly the rare achievements the metric exists for, and using a different
+> denominator than the rarity line beside it. Re-based: **"first N%" = the share of all
+> tracked accounts that earned it before you** (an account that never earned it can't
+> have earned it before you), which is simply earner-percentile × current rarity — same
+> data, one multiplication, denominator-consistent with rarity (never exceeds it). The
+> library returns both values; the display gate is now a **redundancy gate** (show when
+> in the first 75% of earners — later would only restate the rarity), and rank values
+> format finely below 1% ("first 0.4%") since that's where they now live.
+
+**The metric: "you were in the first N% to earn this"** — the share of all tracked
+accounts that earned it before you (see the 2026-07-02 amendment above). A genuine flex
+on rare achievements ("first 0.3%"), and *nice-to-know* on common ones, so we ship it
+for everything.
 
 **Why no stamp is needed.** The game already hands the addon *your* earn date for any
 earned achievement (`GetAchievementInfo`, retroactively). Ship the per-achievement
@@ -228,8 +326,9 @@ Two independent tracks; the surfaces depend only on Track 1.
    Validated end-to-end on the dev DB (offsets monotone, the observed corpus-min earn date
    == the fixed floor). **Not yet on prod**, and the embedded data file is still the
    no-ranks prod snapshot — see the publish milestone before in-game testing.
-2. **Surfaces (addon): NEXT.** tooltip → chat → toast rank lines (read Track 1). Small; the
-   files already do ~90% of the work. The row stays rarity (no change).
+2. **Surfaces (addon): BUILT (uncommitted), awaiting in-game test.** tooltip → chat → toast
+   rank lines, all composed from Core's `RankPhrase` (see SESSION STATE above). The row
+   stays rarity (no change). Prod ranks embedded; next is in-game wording/colour/cap tuning.
 3. **Instance rarity (separate session, above):** independent of 1 & 2; the larger,
    self-contained piece with its own work area and its own maintenance tail.
 

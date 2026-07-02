@@ -18,6 +18,7 @@ Libs\AchievementRarity-1.0\AchievementRarity-1.0.lua
 Core.lua
 Api.lua
 Options.lua
+OptionsAbout.xml
 Tooltip.lua
 Toast.lua
 Chat.lua
