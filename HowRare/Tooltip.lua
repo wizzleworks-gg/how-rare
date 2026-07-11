@@ -3,10 +3,11 @@
 -- tooltip data type); we use the post-call since the line appends at the end.
 local _, G = ...
 
--- Below this attainment the rarity line carries the account count too — at the
--- rare end the count ("one of ~830") is the number that lands, and a bare "<1%"
--- erases the difference between 1-in-110 and 1-in-10,000.
-local COUNT_BELOW_PCT = 1
+-- When the holder count is small (under the shared CountFormMax club boundary)
+-- the rarity line carries it too — at the rare end the count ("one of ~830") is
+-- the number that lands, and a bare % erases the difference between 1-in-110 and
+-- 1-in-10,000. Count-triggered, not %-triggered: a fixed count reads the same in
+-- every scope, where 1% is ~4k accounts in a region but ~9k globally.
 
 -- The shift-detail scope columns: display label + the library's explicit-region
 -- scope name (the library resolves the column; no packed-layout knowledge here).
@@ -30,9 +31,9 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Achievement, functi
     -- always lands last. Neutral white base; RarityLine carries the per-run colours.
     tooltip:AddLine(" ")
     local line = G.RarityLine(G.FormatPct(pct), data.id)
-    if pct < COUNT_BELOW_PCT then
-        line = line .. string.format(" |cffffffff(one of ~%s)|r",
-            BreakUpLargeNumbers(G.AR:GetCount(data.id, G.Scope())))
+    local count = G.AR:GetCount(data.id, G.Scope())
+    if count and count < G.CountFormMax() then
+        line = line .. string.format(" |cffffffff(one of ~%s)|r", BreakUpLargeNumbers(count))
     end
     tooltip:AddLine(line, 1, 1, 1)
     -- When you've earned it early enough that the rank says something the rarity

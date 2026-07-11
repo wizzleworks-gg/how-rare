@@ -8,10 +8,12 @@ local DEFAULTS = {
     tooltip = true, -- rarity (and your rank) on achievement tooltips (G.SurfaceOn)
     chat = true, -- rarity + your status on incoming achievement announcements
     panel = true, -- the rarity % painted on achievement-panel rows
+    rowTooltip = true, -- hover tooltip on achievement-panel rows (Blizzard shows none)
     titleColor = true, -- tier-colour panel-row titles by rarity
     toast = true, -- companion toast on ACHIEVEMENT_EARNED (replaces Blizzard's alert)
     screenshot = "off", -- auto-screenshot mode: "off" / "rare" (rare-and-rarer tiers) / "all"
     scope = "region", -- rarity scope: "region" (your own) or "global" (everyone tracked)
+    countFormMax = 2500, -- small-club boundary: counts below it ("one of ~830"), shares above; 0 = off
     previewModifier = "alt", -- click-to-preview modifier: "alt" / "ctrl" / "off"
 }
 
@@ -68,7 +70,7 @@ local function RegisterSettings()
     -- noise" case). Read at use-time (G.SurfaceOn), so only the panel paint needs a
     -- repaint callback to update already-visible rows.
     local _, tooltipInit = AddCheckbox("tooltip", "Rarity on tooltips",
-        "Add each achievement's rarity — and, when you were notably early, your \"first N%\" rank — to achievement tooltips. Hold Shift while hovering for detail: tier, every region, and your earn date.")
+        "Add each achievement's rarity — and, when you were notably early, how early (\"first ~230\" / \"first 3%\") — to achievement tooltips. Hold Shift while hovering for detail: tier, every region, and your earn date.")
     DependOn(tooltipInit, masterInit, MasterOn)
 
     local _, chatInit = AddCheckbox("chat", "Rarity on chat announcements",
@@ -83,6 +85,14 @@ local function RegisterSettings()
             G.RepaintRows()
         end
     end)
+
+    -- The row hover tooltip (AchievementUI's HookRowTooltip). Blizzard's panel shows
+    -- no tooltip of its own; ours pops the standard achievement tooltip with the
+    -- rarity block. Its own switch, because Krowi / Overachiever users already get a
+    -- row tooltip from those addons and shouldn't see two.
+    local _, rowTipInit = AddCheckbox("rowTooltip", "Tooltip on achievement rows",
+        "Show the standard achievement tooltip — with its rarity — when hovering achievement-panel rows. Blizzard shows none there by itself. Turn this off if you prefer another addon's tooltip there.")
+    DependOn(rowTipInit, masterInit, MasterOn)
 
     local _, toastInit = AddCheckbox("toast", "Earned toast",
         "Replace Blizzard's achievement alert with a toast that adds the achievement's rarity. Turn off to restore Blizzard's own alert.")
@@ -176,6 +186,28 @@ local function RegisterSettings()
         end
     end)
 
+    -- The small-club boundary (G.CountFormMax): below this many accounts, figures
+    -- read as counts ("one of ~830", "first ~230") instead of percentages —
+    -- everywhere a count form exists (tooltip parenthetical, rank phrase, toast).
+    -- A dropdown of curated steps, not a slider: the boundary is a taste in orders
+    -- of magnitude, and round numbers read as the "club sizes" they are. Default
+    -- 2,500 — small enough that a count showing up means something.
+    local countSetting = Settings.RegisterAddOnSetting(
+        category, "HOWRARE_COUNTFORMMAX", "countFormMax", HowRareDB,
+        Settings.VarType.Number, "Show counts for small clubs", DEFAULTS.countFormMax)
+    if Settings.CreateDropdown then
+        Settings.CreateDropdown(category, countSetting, function()
+            local container = Settings.CreateControlTextContainer()
+            container:Add(0, "Off", "Always show percentages, never counts.")
+            container:Add(500, "Under 500", "Counts only for the very rarest clubs.")
+            container:Add(1000, "Under 1,000", "")
+            container:Add(2500, "Under 2,500", "The default.")
+            container:Add(5000, "Under 5,000", "")
+            container:Add(10000, "Under 10,000", "Counts well into the rare tiers.")
+            return container:GetData()
+        end, "When an achievement's holder club — or the number of accounts that earned it before you — is smaller than this, show the count (\"one of ~830\", \"first ~230\") instead of a percentage.")
+    end
+
     -- The rarity "about" section: what the two numbers mean, the live denominator +
     -- snapshot date, and the data attribution. The user opted into this page, so it's
     -- the home for the wizzleworks credit — the lowercase display wordmark in brand
@@ -185,21 +217,25 @@ local function RegisterSettings()
     -- section headers are 45px each and don't wrap, so line-per-header scrolled the
     -- panel. Guarded like the other optional Settings APIs; the fallback is a single
     -- credit header, not the full text.
-    local accounts = G.AR:GetMeta().accounts
+    local meta = G.AR:GetMeta()
     local scope
     if G.region == "global" then
         scope = string.format("%s active accounts worldwide",
-            BreakUpLargeNumbers(accounts.global))
+            BreakUpLargeNumbers(meta.accounts.global))
     else
         scope = string.format("%s active %s accounts",
-            BreakUpLargeNumbers(accounts[G.region]), G.region:upper())
+            BreakUpLargeNumbers(meta.accounts[G.region]), G.region:upper())
     end
+    -- A two-sentence methodology paragraph, wrapped by the FontString itself (no
+    -- hand-placed line breaks — natural wrapping fills each line to the template's
+    -- real width, so the block renders in the fewest lines the panel allows), then
+    -- a set-off one-line footer carrying the denominator, the snapshot date, and
+    -- the credit as dot-chained beats.
     local about = table.concat({
-        "Rarity is the share of active accounts that hold an achievement.",
-        "\"First N%\" is how early you earned it — shown when you were notably early.",
-        string.format("Measured across %s · snapshot %s.", scope, G.AsOfLong()),
-        "", -- blank line sets the credit off from the methodology
-        "Data by |cffffd100wizzleworks|r",
+        "Rarity is the share of active accounts that hold an achievement. "
+            .. "\"First N%\" is how early you earned it, shown when you were notably early.",
+        "", -- blank line sets the footer off from the methodology
+        string.format("Based on %s · %s · Data by |cffffd100wizzleworks|r", scope, meta.asOf),
     }, "\n")
     if Settings.CreateElementInitializer then
         layout:AddInitializer(Settings.CreateElementInitializer(
@@ -319,7 +355,11 @@ local function ExplainWhy(rest)
     end
     local pct = G.RarityValue(id)
     if not pct then
-        print("  not in this data snapshot (newer than its as-of date) — no rarity, no rank.")
+        -- Two indistinguishable causes client-side (both are simply absent from the
+        -- data): newer than the snapshot, or retired — delisted from Blizzard's
+        -- achievement index and deliberately excluded (unobtainable; its rarity
+        -- would measure attrition, not difficulty). Name both, claim neither.
+        print("  not in this data — either newer than the snapshot's as-of date, or retired (delisted by Blizzard and deliberately excluded). No rarity, no rank.")
         return
     end
     local region = G.ScopeRegion()
@@ -352,12 +392,15 @@ local function ExplainWhy(rest)
         end
         return
     end
-    print(string.format("  rank: you were earlier than ~%d%% of its earners → in the first %s of all tracked accounts.",
-        math.floor(earnerPct + 0.5), G.FormatPctFine(rankAll)))
+    print(string.format("  rank: you were earlier than ~%d%% of its earners → in the first %s of all tracked accounts (~%s accounts earned it before you).",
+        math.floor(earnerPct + 0.5), G.FormatPctFine(rankAll), BreakUpLargeNumbers(G.CountForPct(rankAll))))
     if earnerPct > G.RANK_EARLY_MAX then
         print(string.format("  display: suppressed — not notably early. The line shows when you're in the first %d%% of earners; later than that it would only restate the rarity.", G.RANK_EARLY_MAX))
     else
-        print("  display: shows on the tooltip, chat, and toast as \"you were in the " .. G.RankPhrase(id) .. " to earn this\".")
+        local knob = G.CountFormMax()
+        print("  display: shows on the tooltip, chat, and toast as \"you were in the " .. G.RankPhrase(id) .. " to earn this\""
+            .. (knob > 0 and (" (under ~" .. BreakUpLargeNumbers(knob) .. " accounts before you it reads as the count, above as the share).")
+                or " (count forms are off — shares only)."))
     end
 end
 

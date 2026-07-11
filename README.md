@@ -14,24 +14,27 @@ options with `/howrare` or Settings → AddOns → How Rare?.
 
 - **Rarity everywhere** — every achievement tooltip, incoming guild/nearby chat
   announcement, and Blizzard achievement-panel row gets its rarity (a tooltip
-  reads `Rarity: 3%`; below 1% it adds the raw count — `(one of ~830)`). Panel
-  rows — and, on by default, the achievement titles — are tinted by rarity tier
-  (the loot-quality colours), so you can browse by rarity at a glance while
-  scrolling. Hold **Shift** while hovering for detail: the tier by name, the
-  rarity in every region, and your earn date.
-- **Your rank-at-earn** — "you were in the first 0.4% to earn this": the share of
-  all tracked accounts that earned it before you, shown on the tooltip, on chat
-  announcements of achievements you already hold (with a tick/cross and how long
-  ago you earned it), and on the toast — whenever you were notably early among an
-  achievement's earners. Retroactive: it works for achievements earned years
-  before installing.
+  reads `Rarity: 3%`; when the holder club is small it adds the raw count —
+  `(one of ~830)` — with the "small club" boundary configurable in the options).
+  Panel rows — and, on by default, the achievement titles —
+  are tinted by rarity tier (the loot-quality colours), so you can browse by
+  rarity at a glance while scrolling. Blizzard's panel shows no tooltip on row
+  hover; How Rare? adds the standard achievement tooltip there, rarity included
+  (toggleable — turn it off if Krowi's or Overachiever already gives you one).
+  Hold **Shift** while hovering for detail: the tier by name, the rarity in every
+  region, and your earn date.
+- **Your rank-at-earn** — "you were in the first ~230 to earn this" (or, for
+  bigger clubs, "the first 3%"): how many tracked accounts earned it before you,
+  shown on the tooltip, on chat announcements of achievements you already hold
+  (with a tick/cross and how long ago you earned it), and on the toast — whenever
+  you were notably early among an achievement's earners. Retroactive: it works
+  for achievements earned years before installing.
 - **Earned toast** — a companion toast on achievement earn carrying the rarity,
-  styled to be screenshotted; it replaces Blizzard's own alert while on. The
-  celebration scales with the earn: rare-and-rarer tiers tint the flourish in
-  their tier colour, epic and legendary earns pulse it harder. Auto-screenshot is
-  a mode — off, rare earns only, or all earns. `/howrare share` (or the "Share
-  rarest achievement" keybind) re-pops your rarest earned achievement as a
-  shareable card.
+  styled to be screenshotted; it replaces Blizzard's own alert while on.
+  Rare-and-rarer earns tint the celebration flourish in their tier colour.
+  Auto-screenshot is a mode — off, rare earns only, or all earns. `/howrare
+  share` (or the "Share rarest achievement" keybind) re-pops your rarest earned
+  achievement as a shareable card.
 - **Commands** — `/howrare top [n]` lists your rarest earned achievements as
   hoverable links; `/howrare why <link>` explains every number (and every
   suppression) for one achievement; `/howrare status` prints data/version state.

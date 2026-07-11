@@ -34,7 +34,7 @@ if not lib then return end -- the data file registers the library; nothing to at
 -- with the newest data AND the newest API, each arbitrated independently. Bump API_MINOR
 -- on any change to the methods below; `_apiMinor` is owned solely here (the data file
 -- never sets it). With a single consumer this never fires.
-local API_MINOR = 2 -- 2: RankAtEarn all-accounts re-base (allPct, earnerPct / nil, reason); explicit-region scopes
+local API_MINOR = 3 -- 3: junk tier lightened to 0.75 grey; 2: RankAtEarn all-accounts re-base + explicit-region scopes
 if lib._apiMinor and lib._apiMinor >= API_MINOR then return end
 lib._apiMinor = API_MINOR
 
@@ -225,9 +225,11 @@ local TIERS = {
     { name = "rare",      max = 15,        quality = 3 }, -- blue
     { name = "uncommon",  max = 40,        quality = 2 }, -- green
     { name = "common",    max = 70,        quality = 1 }, -- white
-    -- Junk overrides the loot palette's quality-0 grey (0.62 — washed out on light
-    -- backgrounds) with a darker grey so it reads cleanly.
-    { name = "junk",      max = math.huge, quality = 0, color = { r = 0.5, g = 0.5, b = 0.5 } }, -- grey
+    -- Junk overrides the loot palette's quality-0 grey (0.62) with a LIGHTER grey:
+    -- in-game testing found darker greys blend into the achievement panel's dark row
+    -- background. Lighter than stock but clearly dimmer than common's white, so the
+    -- bottom two tiers stay distinct.
+    { name = "junk",      max = math.huge, quality = 0, color = { r = 0.75, g = 0.75, b = 0.75 } }, -- grey
 }
 
 local function tierColor(t)

@@ -16,7 +16,63 @@ Builds on the architecture doc (`../gratz-addon/docs/addon-architecture.md`): §
 addon), §11 (naming / the toast as the outbound surface), and the reverted hover probe
 (`../gratz-addon/docs/dungeon-raid-hover-probe.md`).
 
-## SESSION STATE — 2026-07-03: re-evaluation build + simplify pass COMMITTED; NEXT is in-game verify
+## SESSION STATE — 2026-07-10: first in-game verify done → fix round BUILT (uncommitted); NEXT is re-verify
+
+The 2026-07-10 in-game pass verified panel rows, chat (partially — no live broadcast seen
+yet), toast, options, and `/howrare top`; it found that the rank line never showed because
+its main surface didn't exist (Blizzard's panel has NO row tooltips — our processor only
+fires on chat-link hovers), plus a set of taste/data issues. The agreed fix round is
+**built, luac-clean, uncommitted** in all three repos:
+
+- **Panel-row hover tooltip** (`AchievementUI.lua` HookRowTooltip + `rowTooltip` option,
+  default on): pops the STANDARD achievement tooltip via `SetHyperlink`, which the
+  existing Tooltip.lua processor enriches — row hover ≡ chat-link hover, rank line and
+  Shift-detail included. Toggleable for Krowi/Overachiever users (they have own row tips).
+- **Count-form triggers** (`G.COUNT_FORM_MAX = 10000`, one knob, Core): the tooltip
+  "(one of ~N)" parenthetical now count-triggered (was pct<1%, which the user's ~1%-rarest
+  account never hit); `RankPhrase` renders "first ~2,300" (count form, via new
+  `G.CountForPct`) under the knob, "first 3%" above. **User suspects 10k may be too high —
+  tune from in-game feel.** `/howrare why` explains both forms.
+- **Junk tier lightened** (library, 0.5 → 0.75 grey; API_MINOR 3): the dark grey blended
+  into the panel row background in-game.
+- **Toast celebration simplified**: single pulse for every tier (multi-pulse felt like too
+  much); tier tint on the shine kept. Brand-mark position confirmed fine in-game.
+- **Retired achievements excluded from the data** (gratz `export-rarity-library.py`):
+  achievements delisted from Blizzard's achievement API index (Giddy Up! 891 + 3 others —
+  exactly 4; they enter the catalogue via the wago mirror only) are unobtainable, hidden
+  from the client UI, and their rarity measures attrition — dropped from counts AND ranks
+  at export. Verified on dev (8353→8349). **Fresh PROD snapshot exported (asOf 2026-07-10,
+  minor 2382) + re-embedded** — the embed is current again.
+- **Mode-flip gremlin fixed for good**: something (likely the WoW client reading through
+  the symlink) keeps setting +x on files; `core.fileMode false` is now set in this repo's
+  git config, so mode-only changes no longer show as diffs.
+
+**Re-verify round PASSED in-game 2026-07-10** (row tooltip, junk grey, retired strays
+gone, single-pulse toast, chat confirmed live via a guildie's earn). Two follow-ups from
+it, BUILT (uncommitted) same day:
+
+- **Small-club knob configurable, default 2,500** (user's call — first 1,000 "to make it
+  special", then nudged to 2,500 for the median player; NOTE the user's own SavedVariables
+  already hold 1,000 from the test session — defaults only fill missing keys, so they must
+  flip the dropdown once):
+  `G.CountFormMax()` reads `HowRareDB.countFormMax`; an options dropdown (Off / 500 /
+  1,000 / 2,500 / 5,000 / 10,000) replaces the fixed 10k constant. Now drives ALL THREE
+  count forms — tooltip parenthetical, rank phrase, **and the toast's "One of only ~N
+  people" line** (previously legendary-gated; unified deliberately so every count form
+  flips at one user-owned boundary — flagged to the user as a consistency call).
+- **Toast footer tilde centred**: the footer is now three chained pieces (pre/~/post,
+  `STAMP_TILDE_NUDGE = 3`) like the rarity row, so a count-form rank's "~" sits centred
+  against the digits. NOTE: on tooltip/chat TEXT lines the tilde's height is the font
+  glyph's own — WoW has no per-character vertical offset in a text run; stated to the
+  user as a hard limit.
+
+**NEXT — in-game check of the two follow-ups (then commit all three repos):**
+1. Toast pin → footer "first ~N" tilde now centred (both nudge constants eyeballed).
+2. Options → "Show counts for small clubs" dropdown appears, flips all three count
+   surfaces live (tooltip needs a re-hover; toast a re-pin).
+3. Judge 1,000 as the default in the wild.
+
+## Previous session state — 2026-07-03 (superseded; kept for context)
 
 The 2026-07-01 in-game test session found the rank metric's denominator flaw (see the
 foundation amendment below) and prompted a full product re-evaluation; the whole approved

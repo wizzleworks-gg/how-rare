@@ -42,8 +42,10 @@ local POINTS_PT = 9
 local LINE_GAP = 5
 -- The approximate "~" drops this many px so it reads centred against the digits
 -- instead of floating at the top (its font glyph sits high). Scaled for the
--- rarity row's GameFontNormal (one notch up from the metadata rows).
+-- rarity row's GameFontNormal (one notch up from the metadata rows); the footer
+-- row's smaller GameFontDisableSmall takes a proportionally smaller drop.
 local TILDE_NUDGE = 4
+local STAMP_TILDE_NUDGE = 3
 local GAP = 16
 -- Default toast spot when the player hasn't moved it (the mover overrides it via
 -- HowRareDB.toastPos): top-left of the screen, inset from the corner.
@@ -76,13 +78,12 @@ local SHINE_MARGIN = 0
 -- celebration rather than a competing one.
 local TOAST_ART = "Interface\\AchievementFrame\\AchievementToast"
 
--- Below this attainment the rarity line reads as a population count ("one of only
--- ~N people") — which lands harder than a percentage when the number is genuinely
--- tiny; at or above it, the share as a percentage. Tied to the library's rarest
--- tier (its legendary cutoff) so the count-form and the legendary band can't drift:
--- at <0.1% the count is small enough to brag (<~480 in a region), where a sub-5%
--- count was still ~19k — unimpressive — and a count in the millions is no brag.
-local COUNT_BELOW_PCT = G.AR:GetTiers()[1].maxPct
+-- The rarity line reads as a population count ("one of only ~N people") when the
+-- holder club is under the shared small-club boundary (G.CountFormMax — the same
+-- knob as the tooltip parenthetical and the rank phrase, so every count form flips
+-- at one boundary); at or above it, the share as a percentage. Counts land harder
+-- than percentages exactly when the number is genuinely tiny; a count in the
+-- thousands is no brag, and the knob is the user's own line for "tiny".
 
 local PumpQueue -- forward declaration (the release closure calls it before it's defined)
 
@@ -165,10 +166,20 @@ local function CreateToastFrame(index)
     f.rarityPost:SetJustifyH("LEFT")
     f.rarityPost:SetWordWrap(false)
 
-    -- Earn time, third row — disable-grey so this metadata recedes beneath the name
-    -- and the (now larger) rarity brag, matching the addon's other secondary text.
-    f.stamp = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    f.stamp:SetPoint("TOPLEFT", f.rarityPre, "BOTTOMLEFT", 0, -LINE_GAP - 2)
+    -- Footer, third row (earn time · rank/as-of) — disable-grey so this metadata
+    -- recedes beneath the name and the (now larger) rarity brag, matching the
+    -- addon's other secondary text. Three chained pieces like the rarity row, so a
+    -- count-form rank's "~" can drop by STAMP_TILDE_NUDGE and sit centred against
+    -- the digits; Populate splits the composed text at the tilde (the pct form and
+    -- the as-of form carry none, so the whole line lands in the first piece).
+    f.stampPre = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.stampPre:SetPoint("TOPLEFT", f.rarityPre, "BOTTOMLEFT", 0, -LINE_GAP - 2)
+
+    f.stampTilde = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.stampTilde:SetPoint("LEFT", f.stampPre, "RIGHT", 0, -STAMP_TILDE_NUDGE)
+
+    f.stampPost = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.stampPost:SetPoint("LEFT", f.stampTilde, "RIGHT", 0, STAMP_TILDE_NUDGE)
 
     -- The card's one piece of identity: a small brand-gold "How Rare?" in the footer's
     -- right corner. The toast is the addon's only surface that travels — it's built to
@@ -196,15 +207,11 @@ local function CreateToastFrame(index)
     gi:SetFromAlpha(0); gi:SetToAlpha(1); gi:SetDuration(0.2); gi:SetOrder(1)
     local go = f.glowAnim:CreateAnimation("Alpha")
     go:SetFromAlpha(1); go:SetToAlpha(0); go:SetDuration(0.5); go:SetOrder(2)
-    -- Chained re-play gives the multi-pulse celebration (fxPulsesLeft is set by
-    -- PlayEffects from the earn's tier); the final pulse parks the glow invisible.
+    -- One pulse for every earn, then park the glow invisible. (Tier-scaled
+    -- multi-pulses were tried and rolled back — too much; the tier tint on the
+    -- shine below carries the celebration's scaling instead.)
     f.glowAnim:SetScript("OnFinished", function()
-        if f.fxPulsesLeft and f.fxPulsesLeft > 0 then
-            f.fxPulsesLeft = f.fxPulsesLeft - 1
-            f.glowAnim:Play()
-        else
-            f.glow:SetAlpha(0)
-        end
+        f.glow:SetAlpha(0)
     end)
 
     f.shine = f:CreateTexture(nil, "OVERLAY", nil, 7)
@@ -224,10 +231,10 @@ local function CreateToastFrame(index)
     f.shineAnim:SetScript("OnFinished", function() f.shine:SetAlpha(0) end)
 
     function f.PlayEffects()
-        -- Tier-scaled celebration (Populate sets fxR/G/B + fxPulses from the earn's
-        -- tier): the flourish grows with exactly the thing the addon celebrates.
+        -- Tier-tinted celebration (Populate sets fxR/G/B from the earn's tier): a
+        -- notable earn colours the shine sweep; the flourish itself is the same
+        -- single pulse for every earn.
         f.shine:SetVertexColor(f.fxR or 1, f.fxG or 1, f.fxB or 1)
-        f.fxPulsesLeft = (f.fxPulses or 1) - 1
         f.glow:SetAlpha(0); f.glowAnim:Stop(); f.glowAnim:Play()
         f.shine:SetAlpha(0); f.shineAnim:Stop(); f.shineAnim:Play()
     end
@@ -261,7 +268,7 @@ local queue = {}
 
 -- The rarity row as three left-to-right pieces — prefix, the approximate "~", and
 -- the rest — so Populate can drop the tilde a couple of px to sit centred against
--- the digits. The rarest tier (under COUNT_BELOW_PCT, i.e. legendary) reads as a
+-- the digits. A small holder club (under the shared small-club knob) reads as a
 -- population count ("one of only ~N people" — lands harder than a percentage when
 -- the number is genuinely tiny, and stays truthful as a share of the accounts
 -- the Wizzleworks tracks). The snapshot's as-of is deliberately not shown: the earn
@@ -282,8 +289,9 @@ local function RarityText(achievementId)
         return "|cff999999Rarity not in this data snapshot yet.|r", "", ""
     end
     local hex = G.RarityHex(achievementId)
-    if pct < COUNT_BELOW_PCT then
-        local n = BreakUpLargeNumbers(G.AR:GetCount(achievementId, G.Scope()))
+    local count = G.AR:GetCount(achievementId, G.Scope())
+    if count and count < G.CountFormMax() then
+        local n = BreakUpLargeNumbers(count)
         return "|cffffd100One of only |r",
             string.format("|cff%s~|r", hex),
             string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, scopeFor("people"))
@@ -332,18 +340,15 @@ local function Populate(f, achievementId)
     f.rarityPre:SetText(pre)
     f.rarityTilde:SetText(tilde)
     f.rarityPost:SetText(post)
-    -- Tier-scaled celebration parameters (PlayEffects reads them): the rarer the earn,
-    -- the bigger the moment — notable tiers (IsRareTier, the same boundary the "rare"
-    -- screenshot mode uses) tint the sweep in their tier colour, epic pulses the glow
-    -- twice, legendary three times. Sub-rare tiers (and off-snapshot) keep the stock
-    -- single white flourish.
-    local notable, tier = G.IsRareTier(achievementId)
-    if notable then
+    -- Tier-tint parameters (PlayEffects reads them): notable tiers (IsRareTier, the
+    -- same boundary the "rare" screenshot mode uses) tint the shine sweep in their
+    -- tier colour; sub-rare tiers (and off-snapshot) keep the stock white. The
+    -- flourish is otherwise identical for every earn — tier-scaled pulse counts were
+    -- tried and rolled back as too much.
+    if G.IsRareTier(achievementId) then
         f.fxR, f.fxG, f.fxB = G.RarityColor(achievementId)
-        f.fxPulses = tier == "legendary" and 3 or tier == "epic" and 2 or 1
     else
         f.fxR, f.fxG, f.fxB = 1, 1, 1
-        f.fxPulses = 1
     end
     -- The footer row. Default: when you earned it (the client's real completion date)
     -- · that the rarity figure is the current snapshot's, not the rarity back then.
@@ -352,17 +357,29 @@ local function Populate(f, achievementId)
     -- get — so it rides the earn-date row it derives from, in brand gold, replacing the
     -- as-of note (the earn date already dates the card). A live earn's rank is ~100%
     -- → RankPhrase nil → the default as-of form, so this is data-driven, not path-keyed.
-    -- The earn date is dropped when unknown (e.g. an unearned preview).
+    -- The earn date is dropped when unknown (e.g. an unearned preview). Split at a
+    -- count-form rank's "~" so the tilde piece sits nudged (see the frame's footer
+    -- pieces); each piece carries its own colour codes.
     local earned = G.AchievementEarnedShort(achievementId)
     local rank = G.RankPhrase(achievementId)
+    local pre, tilde, post
     if rank then
-        f.stamp:SetText(earned
-            and string.format("Earned %s  ·  |cffffd100%s|r", earned, rank)
-            or string.format("|cffffd100%s|r", rank))
+        local lead = earned and ("Earned " .. earned .. "  ·  ") or ""
+        local rankPre, rankPost = rank:match("^(.-)~(.+)$")
+        if rankPre then
+            pre = lead .. "|cffffd100" .. rankPre .. "|r"
+            tilde = "|cffffd100~|r"
+            post = "|cffffd100" .. rankPost .. "|r"
+        else
+            pre = lead .. "|cffffd100" .. rank .. "|r"
+        end
     else
         local asOf = "Rarity as of " .. G.AsOfShort()
-        f.stamp:SetText(earned and (string.format("Earned %s  ·  %s", earned, asOf)) or asOf)
+        pre = earned and (string.format("Earned %s  ·  %s", earned, asOf)) or asOf
     end
+    f.stampPre:SetText(pre)
+    f.stampTilde:SetText(tilde or "")
+    f.stampPost:SetText(post or "")
     return true
 end
 
@@ -453,18 +470,18 @@ end
 G.ShowToast = ShowToast
 
 -- Client-known ids from the rarity snapshot for the debug/sample toasts, rarest
--- (count-form, under COUNT_BELOW_PCT) first so a debug toast shows the "one of
--- only ~N people" count rather than a percentage. Bounded by DEBUG_ID_CAP — the
--- debug/sample paths need only a handful — so it stops once it has enough rather
+-- (count-form, under the shared small-club knob) first so a debug toast shows the
+-- "one of only ~N people" count rather than a percentage. Bounded by DEBUG_ID_CAP —
+-- the debug/sample paths need only a handful — so it stops once it has enough rather
 -- than scanning the whole snapshot. Rare ids come first; a few percentage-form ids
--- follow as a fallback when too few rare ones are client-known.
+-- follow as a fallback when too few rare ones are client-known (or the knob is off).
 local DEBUG_ID_CAP = 12
 local function DebugIds()
     local rare, rest = {}, {}
     for id in pairs(G.AR:GetData()) do
         if G.AchievementInfo(id) then
-            local pct = G.RarityValue(id)
-            if pct and pct < COUNT_BELOW_PCT then
+            local count = G.AR:GetCount(id, G.Scope())
+            if count and count < G.CountFormMax() then
                 rare[#rare + 1] = id
                 if #rare >= DEBUG_ID_CAP then
                     break

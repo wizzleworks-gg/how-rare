@@ -28,12 +28,14 @@ function G.Scope()
     return (HowRareDB and HowRareDB.scope == "global") and "global" or "region"
 end
 
--- The data region a scope reads: "global" → global; "region"/default → home.
--- The toast's scope-region noun reads this; the library does its own column
--- resolution internally, so there's no ScopeIndex here any more.
+-- The data region a scope reads: "global" → global; an explicit region name
+-- ("us"/"eu") → itself (mirroring the library's explicit-region scopes);
+-- "region"/default → home. The toast's scope-region noun and the count-form
+-- denominators read this; the library does its own column resolution internally.
 function G.ScopeRegion(scope)
-    if (scope or G.Scope()) == "global" then
-        return "global"
+    scope = scope or G.Scope()
+    if scope == "global" or scope == "us" or scope == "eu" then
+        return scope
     end
     return G.region
 end
@@ -306,17 +308,46 @@ end
 -- so the /howrare why report can explain a suppression with the real number.
 G.RANK_EARLY_MAX = 75
 
--- The rank-at-earn brag as a ready phrase — "first 3%", "first 0.4%" — or nil when
--- there's no usable rank (RankAtEarn nil) or you weren't notably early among the
--- achievement's earners (RANK_EARLY_MAX). The one shared wording + threshold source:
--- every surface composes its line from this, so the phrasing and the gate can't drift
--- between tooltip, chat, and toast. Fine-formatted: rank values live at the rare end,
--- where "<1%" would flatten real differences. earnTime (optional) threads a caller's
+-- Below this many accounts, a figure reads better as the count than as a share —
+-- "one of ~830" / "first ~2,300" land where "1%" / "first 0.3%" flatten. ONE knob
+-- drives every count form (the tooltip's "(one of ~N)" parenthetical, RankPhrase's
+-- absolute form, and the toast's "One of only ~N people" line) so the "small club"
+-- boundaries can't drift apart. A saved option (HowRareDB.countFormMax, the options
+-- dropdown): the default 2,500 keeps counts special — a genuinely small club — and
+-- 0 turns count forms off. Defensive pre-load fallback, like the other option reads.
+local COUNT_FORM_DEFAULT = 2500
+function G.CountFormMax()
+    local v = HowRareDB and HowRareDB.countFormMax
+    return type(v) == "number" and v or COUNT_FORM_DEFAULT
+end
+
+-- The share (0–100) of a scope's tracked accounts, as the account count it stands
+-- for (min 1 — a rounded 0 would read as nobody). The absolute form of any
+-- percentage under the same denominators the library's figures use; RankPhrase and
+-- /howrare why read it.
+function G.CountForPct(pct, scope)
+    local denom = AR:GetMeta().accounts[G.ScopeRegion(scope)]
+    return math.max(1, math.floor(pct / 100 * denom + 0.5))
+end
+
+-- The rank-at-earn brag as a ready phrase — or nil when there's no usable rank
+-- (RankAtEarn nil) or you weren't notably early among the achievement's earners
+-- (RANK_EARLY_MAX). The one shared wording + threshold source: every surface
+-- composes its line from this ("you were in the <phrase> to earn this", "· <phrase>"),
+-- so the phrasing and the gates can't drift between tooltip, chat, and toast. Two
+-- forms, split at CountFormMax accounts-before-you: a small club reads as the
+-- count ("first ~2,300" — lands harder than a sliver of a percent), a big one as the
+-- share ("first 3%"; fine-formatted — rank shares live at the rare end, where "<1%"
+-- would flatten real differences). earnTime (optional) threads a caller's
 -- already-derived earn date through, like EarnedAgo.
 function G.RankPhrase(achievementId, scope, earnTime)
     local pct, earnerPct = G.RankAtEarn(achievementId, scope, earnTime)
     if not pct or earnerPct > G.RANK_EARLY_MAX then
         return nil
+    end
+    local before = G.CountForPct(pct, scope)
+    if before < G.CountFormMax() then
+        return "first ~" .. BreakUpLargeNumbers(before)
     end
     return "first " .. G.FormatPctFine(pct)
 end
@@ -378,10 +409,9 @@ function G.RarityTextAndColor(achievementId, scope)
 end
 
 -- Whether an achievement's tier is "rare or rarer" — the addon's ONE judgment of
--- which earns are notable (worth an auto-screenshot, worth the bigger toast
--- celebration), held in a single predicate so the two can't drift apart. Returns
--- the tier as a second value for callers that also need it (the toast derives its
--- pulse count from it without a second lookup).
+-- which earns are notable (worth an auto-screenshot, worth the tier-tinted toast
+-- flourish), held in a single predicate so the two can't drift apart. Returns the
+-- tier as a second value for callers that also need it.
 function G.IsRareTier(achievementId, scope)
     local tier = G.RarityTier(achievementId, scope)
     return tier == "legendary" or tier == "epic" or tier == "rare", tier

@@ -1,7 +1,7 @@
 -- AchievementUI.lua — rarity in Blizzard's achievement panel: the % painted on
--- every list row (browse-by-rarity while scrolling) and, toggleable, the row title
--- tinted by rarity tier. Augments only the Blizzard frame — KAF's own browser is a
--- separate surface.
+-- every list row (browse-by-rarity while scrolling), toggleable row-title tinting
+-- by rarity tier, and a hover tooltip on every row. Augments only the Blizzard
+-- frame — KAF's own browser is a separate surface.
 local _, G = ...
 
 -- Tier-colouring of the row's title (button.Label), toggleable via
@@ -90,6 +90,38 @@ local function HookRowClick(button)
     end)
 end
 
+-- Hover tooltip on a panel row. Blizzard's panel shows NO tooltip on row hover —
+-- other addons (Krowi, Overachiever) each build their own, which is why this is
+-- toggleable (rowTooltip): their users keep a single tooltip by turning ours off.
+-- Ours is deliberately not a reproduction of theirs: it pops the STANDARD
+-- achievement tooltip (the one a chat link shows), which the Tooltip.lua processor
+-- then enriches with the rarity block — so a row hover and a link hover run the
+-- exact same pipeline, rank line and Shift-detail included. HookScript (not
+-- SetScript): the pooled frames keep whatever hover behaviour they have.
+local function HookRowTooltip(button)
+    if button.HowRareTipHooked then
+        return
+    end
+    button.HowRareTipHooked = true
+    button:HookScript("OnEnter", function(self)
+        if not (G.SurfaceOn("rowTooltip") and self.id) then
+            return
+        end
+        local link = GetAchievementLink(self.id)
+        if not link then
+            return
+        end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetHyperlink(link)
+        GameTooltip:Show()
+    end)
+    button:HookScript("OnLeave", function(self)
+        if GameTooltip:GetOwner() == self then
+            GameTooltip:Hide()
+        end
+    end)
+end
+
 local function InstallHooks()
     local scrollBox = AchievementFrameAchievements and AchievementFrameAchievements.ScrollBox
     if not scrollBox then
@@ -100,10 +132,12 @@ local function InstallHooks()
     ScrollUtil.AddInitializedFrameCallback(scrollBox, function(_, frame)
         PaintRarity(frame)
         HookRowClick(frame)
+        HookRowTooltip(frame)
     end, G, false)
     scrollBox:ForEachFrame(function(frame)
         PaintRarity(frame)
         HookRowClick(frame)
+        HookRowTooltip(frame)
     end)
     G.achievementUIHooked = true
     G.Debug("achievement UI hooks installed")

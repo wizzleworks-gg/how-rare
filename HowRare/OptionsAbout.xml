@@ -7,13 +7,15 @@
 	     returns no extent (verified against Blizzard_SettingsList.lua), so the
 	     height here IS the block's footprint. Mixin lives in Options.lua (loaded
 	     first); Init fills parentKey Text. spacing = the inter-line gap. -->
-	<!-- Sized to the ~150px the panel has spare beneath the controls: the standard
-	     (not Small) white font with relaxed line spacing; the text sits one line
-	     down from the last control (the y="-28" top inset) and the credit line is
-	     set off by a blank line (Options.lua composes the text). Tune Size y /
-	     spacing / the top inset together if the fit is off. -->
+	<!-- Sized to the methodology paragraph's usual two wrapped lines + blank + the
+	     one-line data/credit footer (~4 rendered lines at ~20px each, after the
+	     y="-28" top inset that sets the text one line down from the last control):
+	     the standard (not Small) white font with relaxed line spacing; Options.lua
+	     composes the text as one auto-wrapping paragraph + footer. Tune Size y /
+	     spacing / the top inset together if the fit is off — too tall scrolls the
+	     settings panel, too short overflows the block's slot. -->
 	<Frame name="HowRareAboutTemplate" virtual="true" mixin="HowRareAboutMixin">
-		<Size y="148"/>
+		<Size y="112"/>
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" spacing="6">
