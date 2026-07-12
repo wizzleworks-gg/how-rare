@@ -21,8 +21,8 @@ AddOns → How Rare?.
   are tinted by rarity tier (the loot-quality colours), so you can browse by
   rarity at a glance while scrolling. Blizzard's panel shows no tooltip on row
   hover; How Rare? adds the standard achievement tooltip there, rarity included
-  (toggleable — turn it off if Krowi's or Overachiever already gives you one).
-  Hold **Shift** while hovering for detail: the tier by name, the rarity in every
+  (toggleable — turn it off if you prefer another addon's tooltip there). Hold
+  **Shift** while hovering for detail: the tier by name, the rarity in every
   region, and your earn date.
 - **Your rank-at-earn** — "you were in the first ~230 to earn this" (or, for
   bigger clubs, "the first 3%"): how many tracked accounts earned it before you,

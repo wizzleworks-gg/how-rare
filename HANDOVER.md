@@ -1,237 +1,77 @@
-# HANDOVER — How Rare? rarity-surface expansion (design revised 2026-07-02)
+# HANDOVER — How Rare? v1: surfaces SHIPPED + signed off; release train NEXT
 
-**This theme:** grow where How Rare? surfaces rarity. A **rarity-at-earn foundation**
-(the *rank metric*, gratz-side) feeds **tooltip / chat / toast** surfaces, plus
-**rarity on dungeon/raid content** (Encounter Journal, map pins, Group Finder) as a
-separate track. All **in How Rare?** (the rarity layer). Design agreed 2026-06-28,
-**revised 2026-06-29** (stamp → gratz-side rank metric) and **again 2026-07-02** (rank
-denominator re-based to all accounts + a full product re-evaluation build — see the
-amendment and SESSION STATE below). **Track 1 (the foundation) is BUILT + committed
-(2026-06-29, prod OOM fixed 2026-07-01); Track 2 (surfaces) + the re-evaluation set are
-BUILT, uncommitted, awaiting in-game verify (see SESSION STATE below); instance rarity
-(Track 3) is its own session.**
+**Theme status:** the rarity-surface expansion — rank metric → tooltip/chat/toast, the
+v1 headliners (**"How rare are YOU?"** collection standing + **Gz!**), panel-row
+tooltips, the character-sheet verdict row — is **built, in-game verified, SIGNED OFF
+(2026-07-12), and committed in all three repos.** What remains of v1 is the **release
+train** below: packaging and admin, no product code. Instance rarity (Track 3) stays a
+separate future session — its parked design is at the bottom of this file, with the
+architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§11,
+`../gratz-addon/docs/rarity-data-library.md`).
 
-Builds on the architecture doc (`../gratz-addon/docs/addon-architecture.md`): §6
-(rarity-at-earn), §7 (instance→achievement map), §3③ (the dropped instance-tooltips
-addon), §11 (naming / the toast as the outbound surface), and the reverted hover probe
-(`../gratz-addon/docs/dungeon-raid-hover-probe.md`).
+## WHERE THINGS STAND (2026-07-12, signed off)
 
-## SESSION STATE — 2026-07-11: v1 headliners BUILT (uncommitted) — "How rare are YOU?" + Gz!
+- **Repos:** gratz — all rarity/standing work committed AND pushed/deployed: the
+  nightly 05:30 counter computes rarity + rank curves + the `rarity_score` standing
+  distribution; migration 083 (`v_shipped_achievements` + `standing_meta`) is applied
+  on prod. how-rare `2c89164` + achievement-rarity `5bf6e1b` — committed, **NOT
+  pushed** (their pushes deploy nothing; push whenever, tagging implies it).
+- **Embed:** the addon carries the prod snapshot asOf **2026-07-12** (828,106 tracked
+  accounts; all three standing scopes; the 4 retired achievements excluded). It drifts
+  ~a day stale per cron tick — re-publish right before tagging.
+- **Verified:** full in-game sign-off; stub-Lua harness green against the real data
+  file (standing interpolation, elite-tail cap + monotonicity, no-standing
+  degradation); luac/XML clean. Library API at **API_MINOR 4**; collection standing
+  lives fully in the LIBRARY (weight/score/standing/tier) — any consumer can build the
+  verdict; How Rare? adds only the isEarned callback + the surfaces.
 
-The killer-feature decision landed (user-approved): **both** go in v1.
+## NEXT — the release train (one session, admin + packaging only)
 
-- **Collection standing ("your achievements are Epic" — user's wording, "achievements"
-  not "collection" in copy).** Score = Σ −log2(global attainment share) over earned
-  snapshot achievements ("surprise" points); the corpus distribution ships as
-  percentile→score breakpoints. Chain built end-to-end: counter `rarity_score` standing
-  metric (rides the existing rank pass — weights need finished counts; deci-point ints,
-  `SCORE_SCALE=10`; eligibility = the SAME live∧Blizzard-indexed set the export ships —
-  lockstep filters, flagged as consistency debt) → export `standingLadder`/`standing`
-  (points, ÷10) → library `CollectionWeight/Score/Standing/Tier` (API_MINOR 4; tier =
-  the loot bands applied to top-% of accounts) → addon `G.CollectionVerdict` +
-  `/howrare me` (verdict + score print, pinnable standing card off the toast frame —
-  `PopulateStanding`, `ShowSample` generalised to a fill-fn, `PinButtons` extracted).
-  Validated on dev end-to-end (counter run + export show plausible curves).
-  **SEQUENCING:** prod has no `rarity_score` rows until the new counter runs there
-  (gratz push → next 05:30 cron), so `/howrare me` on the current embed prints the
-  score + "no standing in this snapshot" line; the REAL publish (re-export + re-embed
-  with standing) happens after that cron tick. Library + addon degrade gracefully.
-- **Gz! (click-to-send congratulation).** `[Gz!]` affordance (gold, locally-visible,
-  `garrmission:`-typed link — unknown link types aren't clickable; that's the
-  established addon-space carrier) appended to every enriched announcement; click sends
-  "Gz! [link]" (+ " — only 0.4% of EU accounts have this!" on IsRareTier earns) into
-  the ORIGIN channel (guild→GUILD, nearby→SAY; the click is the hardware event SAY
-  needs). Strictly never-auto; 30s per-(achievement,channel) cooldown; sent line
-  deliberately UNBRANDED (conventions updated in CLAUDE.md). Rides the "chat" toggle.
-- gratz BACKLOG gained the profile-page surfacing of the same standing (reads the same
-  `population_standing` metric; tier framing over raw rank).
-- **Open consistency debt (flagged via TECH_DEBT hook, user to decide):** the
-  live∧Blizzard-indexed "shipped set" filter now exists in THREE expressions (export
-  counts query, export ranks query, counter score-eligibility) + the ×10/÷10 scale pair
-  (counter/export). Candidate fix: one `v_shipped_achievements` view + a scale row in a
-  meta table; deferred unless the user opts in.
+1. **One-command publish script** — automate today's manual flow (README "Updating
+   the embedded library"): `ssh -f -N -L 15432:localhost:5432 root@204.168.168.180` →
+   `gratz/.venv/bin/python scripts/export-rarity-library.py --database-url
+   postgresql://gratz:gratz@localhost:15432/gratz` (writes the library repo's data
+   file; its output must say `standing scopes: ['eu', 'global', 'us']`) → commit/push
+   achievement-rarity → `cp -R ../achievement-rarity/AchievementRarity-1.0
+   HowRare/Libs/ && chmod 644 HowRare/Libs/AchievementRarity-1.0/*.lua` → commit
+   how-rare. Decide depth: local one-command now vs box-side auto-push later — the
+   trade-offs are in "Deferred from the shipped library theme" below.
+2. **CurseForge admin:** create the How Rare? project; set `CF_API_KEY` (secret) +
+   `CF_PROJECT_ID` (variable) on the how-rare repo. The tag-driven
+   `.github/workflows/release.yml` is built but its upload path has NEVER run
+   end-to-end — the first tag proves it. TWO OPEN DECISIONS: (a) how-rare repo
+   visibility (currently private; README links to the public library repo as its
+   reference consumer); (b) a standalone CurseForge listing for the library at launch —
+   its whole point is the freshness channel, only honest once refresh is automated
+   (distribution model below); if yes it needs its own release workflow (mirror
+   how-rare's; zip = TOC + LibStub + the versioned lib folder).
+3. **Library release tidy:** CHANGELOG `## Unreleased` → a named release; TOC
+   `## Version:` (stale at 2026.06.28) → the snapshot date at release; settle the
+   version scheme (date-based fits the freshest-wins minor).
+4. **Tag:** re-run the publish (step 1) for a fresh embed, then on how-rare
+   `git tag v1.0.0 && git push --tags` — the tag must match the CHANGELOG `## 1.0.0`
+   heading; CI stamps the TOC version and uploads with that changelog section.
 
-**Also built same day (user-approved design): the character-sheet row**
-(`CharacterSheet.lua`, `characterSheet` option, default on): "Achievements — <Tier>"
-as a stat-style row at the BOTTOM of the Character Info stats pane (own frame, no
-Blizzard stat internals touched; row geometry constants are eyeball-first-cut), full
-verdict on hover. Verdict cached (scope-keyed; invalidated on ACHIEVEMENT_EARNED),
-refreshed via the master/scope/toggle Settings callbacks. Hidden until the snapshot
-ships standing. Own sheet only — inspect can't read another player's earned list.
+## Shipped log (compressed — full detail in the three repos' git logs)
 
-**gratz pushed + deployed 2026-07-11 (both rounds):** the standing metric + the
-consistency fix (migration 083 `v_shipped_achievements` + `standing_meta` — applied on
-prod, view verified returning 8,349). The 05:30 cron next computes the distribution.
-
-**2026-07-12: standing data LIVE + first-verify fixes.** The 05:30 cron OOM'd twice at
-the 5G cap — (1) deci-point buckets made ~830K accounts ~830K histogram values
-(SCORE_SCALE 10→1, whole points); (2) the per-rep scores dict grew INSIDE
-rank_histogram's churn loop, pinning the heap against the per-chunk malloc_trim
-(preallocated flat array + upfront key→slot index; the "no long-lived allocation in
-the churn window" rule, now documented in the function). cron-rarity.sh runs Python
-unbuffered so a SIGKILL leaves its progress prints. Third run clean (~15K buckets per
-region); fresh prod snapshot (asOf 2026-07-12, all three standing scopes) exported +
-re-embedded; harness passes on the real file. From the user's first in-game pass:
-character-sheet row now gated to **Uncommon or better** (junk/common there reads as an
-insult; /howrare me stays honest for all tiers), and the toast's brand mark moved to
-its **own line** below the footer (a long name · five-digit score · date footer needs
-the full width).
-
-**SIGNED OFF 2026-07-12** after the full in-game pass: me verdict + card, character
-sheet, Gz! (a click-dead bug found by the user's manual test — `local a, b = x and
-s:match(...)` truncates a multi-capture match to its first value, so the channel never
-arrived; fixed, plus an 8-angle /code-review round that fixed: the "rarer than 100.0%"
-display rounding, the standing cap/monotonicity at the elite tail, the standing card
-destroying live toast queues, pin-button leakage onto real toasts, Gz on own earns /
-modified clicks / channel allowlist, the `why` scope mismatch, a shared verdict cache
-in Core with coalesced earn invalidation, and one-owner helpers for tier labels /
-standing format / notability). Options page restructured on user feedback: data strap
-("<denominator> · <asOf> · Data by wizzleworks") rides the page title; bottom block is
-the two-sentence methodology only; checkbox label "Achievements tier on character".
-
-**NEXT — the release train (the session-plan remainder):** one-command publish script
-(tunnel → export → commit/push library → re-embed → commit addon), CurseForge admin
-(create both projects, set CF_API_KEY/CF_PROJECT_ID, repo visibility decision, library
-release workflow), library CHANGELOG "Unreleased" → version + TOC version refresh,
-then tag v1.0.0. Instance rarity (Track 3) stays its own future session.
-
-## Previous session state — 2026-07-10: first in-game verify done → fix round SHIPPED (committed 2026-07-11)
-
-The 2026-07-10 in-game pass verified panel rows, chat (partially — no live broadcast seen
-yet), toast, options, and `/howrare top`; it found that the rank line never showed because
-its main surface didn't exist (Blizzard's panel has NO row tooltips — our processor only
-fires on chat-link hovers), plus a set of taste/data issues. The agreed fix round is
-**built, luac-clean, uncommitted** in all three repos:
-
-- **Panel-row hover tooltip** (`AchievementUI.lua` HookRowTooltip + `rowTooltip` option,
-  default on): pops the STANDARD achievement tooltip via `SetHyperlink`, which the
-  existing Tooltip.lua processor enriches — row hover ≡ chat-link hover, rank line and
-  Shift-detail included. Toggleable for Krowi/Overachiever users (they have own row tips).
-- **Count-form triggers** (`G.COUNT_FORM_MAX = 10000`, one knob, Core): the tooltip
-  "(one of ~N)" parenthetical now count-triggered (was pct<1%, which the user's ~1%-rarest
-  account never hit); `RankPhrase` renders "first ~2,300" (count form, via new
-  `G.CountForPct`) under the knob, "first 3%" above. **User suspects 10k may be too high —
-  tune from in-game feel.** `/howrare why` explains both forms.
-- **Junk tier lightened** (library, 0.5 → 0.75 grey; API_MINOR 3): the dark grey blended
-  into the panel row background in-game.
-- **Toast celebration simplified**: single pulse for every tier (multi-pulse felt like too
-  much); tier tint on the shine kept. Brand-mark position confirmed fine in-game.
-- **Retired achievements excluded from the data** (gratz `export-rarity-library.py`):
-  achievements delisted from Blizzard's achievement API index (Giddy Up! 891 + 3 others —
-  exactly 4; they enter the catalogue via the wago mirror only) are unobtainable, hidden
-  from the client UI, and their rarity measures attrition — dropped from counts AND ranks
-  at export. Verified on dev (8353→8349). **Fresh PROD snapshot exported (asOf 2026-07-10,
-  minor 2382) + re-embedded** — the embed is current again.
-- **Mode-flip gremlin fixed for good**: something (likely the WoW client reading through
-  the symlink) keeps setting +x on files; `core.fileMode false` is now set in this repo's
-  git config, so mode-only changes no longer show as diffs.
-
-**Re-verify round PASSED in-game 2026-07-10** (row tooltip, junk grey, retired strays
-gone, single-pulse toast, chat confirmed live via a guildie's earn). Two follow-ups from
-it, BUILT (uncommitted) same day:
-
-- **Small-club knob configurable, default 2,500** (user's call — first 1,000 "to make it
-  special", then nudged to 2,500 for the median player; NOTE the user's own SavedVariables
-  already hold 1,000 from the test session — defaults only fill missing keys, so they must
-  flip the dropdown once):
-  `G.CountFormMax()` reads `HowRareDB.countFormMax`; an options dropdown (Off / 500 /
-  1,000 / 2,500 / 5,000 / 10,000) replaces the fixed 10k constant. Now drives ALL THREE
-  count forms — tooltip parenthetical, rank phrase, **and the toast's "One of only ~N
-  people" line** (previously legendary-gated; unified deliberately so every count form
-  flips at one user-owned boundary — flagged to the user as a consistency call).
-- **Toast footer tilde centred**: the footer is now three chained pieces (pre/~/post,
-  `STAMP_TILDE_NUDGE = 3`) like the rarity row, so a count-form rank's "~" sits centred
-  against the digits. NOTE: on tooltip/chat TEXT lines the tilde's height is the font
-  glyph's own — WoW has no per-character vertical offset in a text run; stated to the
-  user as a hard limit.
-
-**NEXT — in-game check of the two follow-ups (then commit all three repos):**
-1. Toast pin → footer "first ~N" tilde now centred (both nudge constants eyeballed).
-2. Options → "Show counts for small clubs" dropdown appears, flips all three count
-   surfaces live (tooltip needs a re-hover; toast a re-pin).
-3. Judge 1,000 as the default in the wild.
-
-## Previous session state — 2026-07-03 (superseded; kept for context)
-
-The 2026-07-01 in-game test session found the rank metric's denominator flaw (see the
-foundation amendment below) and prompted a full product re-evaluation; the whole approved
-improvement set is **built, luac-clean, functionally tested outside WoW** (a stubbed-Lua
-harness verified the redefined metric against a hand-computed oracle, explicit-region
-scopes, and the suppression reasons), **cleaned by a 4-angle /simplify pass, and
-committed in both repos** (2026-07-03, user-approved). The simplify pass consolidated:
-one rare-tier predicate (screenshot mode + toast flourish share the boundary), one
-snapshot-wide earned scan (share / top / pin), explicit-region scopes in the library
-(consumers no longer index its packed triples), RankAtEarn nil-reasons ("off-snapshot" /
-"no-curve" / "date-floor" — /howrare why reads them instead of the library's tables),
-earn-date derivation threaded once through the hot chat/tooltip paths, and the toast on
-the shared per-surface gate.
-
-**Built this session (all uncommitted):**
-- **Rank metric re-based (library API half, `achievement-rarity` sibling + re-embedded):**
-  `RankAtEarn` now returns the share of ALL tracked accounts that earned it before you
-  (= earner-percentile × rarity; denominator-consistent with the rarity %, never exceeds
-  it) plus the earner-only percentile as a second return. `API_MINOR = 2`. Data file
-  unchanged (same curves, prod `asOf 2026-07-01`).
-- **Gate + formatting (Core):** the old 50%-of-earners flex cutoff is now a **redundancy
-  gate** `G.RANK_EARLY_MAX = 75` (the line shows when you're in the first 75% of earners;
-  later than that it would only restate the rarity — a live earn stays suppressed).
-  `G.FormatPctFine` (whole ≥1%, one decimal to 0.1%, "<0.1%" below) formats the rank and
-  the other rare-end surfaces; the site-convention FormatPct is unchanged elsewhere.
-- **Tooltip:** sub-1% rarity lines append the count ("(one of ~830)"); Shift-hover detail
-  view (tier name, US/EU/Global fine %s, your earn date + ago); per-surface toggle.
-- **Chat:** ✓/✗ replaced with the raid ready-check icon textures (WoW fonts have no ✓/✗
-  glyph — they rendered as coloured boxes in-game); per-surface toggle.
-- **Toast:** tier-scaled celebration (rare+ tiers tint the shine sweep in tier colour;
-  epic pulses the glow ×2, legendary ×3); small brand-gold **"How Rare?" mark** bottom-right
-  (the travelling-surface exception to brand silence — CLAUDE.md conventions updated);
-  screenshot became a **mode** (off / rare earns / all; old boolean saved-vars coerced);
-  `/howrare toast pin` now showcases YOUR rarest earned (rank-braggable + name-fits first).
-- **Options:** per-surface checkboxes (tooltip / chat / panel %), screenshot dropdown,
-  and a stale-snapshot nudge on the login line (>60 days old). The about block is ONE
-  compact small-font paragraph via our own settings-list element template
-  (`OptionsAbout.xml` + `HowRareAboutMixin`, TOC'd) — stock section headers are 45px
-  per line and don't wrap, so line-per-header truncated AND scrolled; the factory
-  contract (frame:Init(initializer), extent = template height) was verified against
-  Blizzard_SettingsList.lua / ScrollUtil.lua in the Gethe mirror. The credit is the
-  lowercase display wordmark in brand gold: "Data by wizzleworks" (running prose keeps
-  "the Wizzleworks" — convention recorded in CLAUDE.md).
-- **Chat separator:** the rarity tag lost its brackets — beats chain with middle dots
-  (`… · rarity 3% ✓ · ~2 years ago · first 0.4%`).
-- **Commands:** `/howrare top [n]` (your rarest earned as hoverable links, fine %s +
-  rank) and `/howrare why <link|id>` (full per-achievement story: rarity, count, tier,
-  your earn, your rank, and exactly which rule shows/suppresses each line).
-- **Docs updated for consistency:** both READMEs, both CHANGELOGs, how-rare CLAUDE.md
-  (brand exception + slash list). Deliberately NOT built (product boundaries): rarity
-  browser/sort UI (paint-and-glance altitude confirmed), realm scope, historical curves;
-  also skipped as needing live-client verification first: comparison-frame + guild-tab
-  painting, Krowi coexistence check.
-
-**NEXT — in-game verify (then commit):**
-1. `/reload`, then `/howrare why <shift-click an achievement link>` — the new
-   self-diagnosis; confirm its story matches what the surfaces show.
-2. Chat: broadcast → ready-check tick/cross icons (NOT coloured squares now) + "ago ·
-   first N%" on early-held earns.
-3. Tooltip: sub-1% count parenthetical; Shift-hover detail; rank line on early earns
-   ("first 0.x%" values now — much smaller than before, by design).
-4. Toast: `/howrare toast pin` (your earned card + rank row + brand mark placement —
-   the mark's y-offset is eyeballed, may need a nudge); tier-tinted shine / pulses via
-   `/howrare toast 3`; screenshot mode dropdown.
-5. `/howrare top` — the list + hoverable links.
-6. Judge the taste calls: RANK_EARLY_MAX=75, the "first 0.4%" wording, tint intensity.
-
-(Committed 2026-07-03 with the spurious `Libs/*` 100644→100755 mode flips reverted via
-chmod, so they never entered history. Anything the in-game verify shakes out lands as
-follow-up commits.)
-
-**gratz side — DONE + deployed, background only (NOT front-end work):** Track 1's rank pass
-was OOM-killing the prod counter (~6 GB); fixed and deployed across four gratz commits —
-`0ceda75` / `58e1788` / `87c5a9c` (the memory fix: isolate the rank histogram + malloc_trim
-the per-chunk churn) and `b5c7af0` (a 5 GB cgroup cap on the nightly counter so a future
-runaway kills the counter, not the web app). The nightly cron now populates the rank tables
-(verified 2026-07-01: 882K reps, 0 drift, ~3.35 GB peak — fine on the 7.75 GB box; the
-pre-floor date warning is a negligible stray). Full detail is in the gratz git log. The one
-carried-forward item is the publish AUTOMATION (auto export→push→re-embed), still deferred
-below — this session's export+embed was by hand. None of this concerns the front-end session.
+- **2026-07-03:** rank metric re-based to all-accounts (API_MINOR 2) + product
+  re-evaluation build + 4-angle simplify pass.
+- **2026-07-10/11:** verify rounds → panel-row tooltips (the rank line's real home),
+  configurable count-form knob (default 2,500), junk grey 0.75 (API_MINOR 3),
+  single-pulse toast, retired-achievement exclusion (4 Blizzard-API-delisted strays,
+  Giddy Up! et al.), mode-flip gremlin killed (`core.fileMode false`).
+- **2026-07-11/12:** v1 headliners — collection standing end-to-end (counter metric →
+  export curves → library API_MINOR 4 → `/howrare me` + card + character-sheet row)
+  and Gz!. gratz side survived two 5G-cap OOMs (deci-point bucket explosion →
+  whole-point SCORE_SCALE 1; a scores dict grown inside the rank pass's trim-sensitive
+  churn loop → preallocated flat array; both lessons documented in rarity-counter.py;
+  cron now runs Python unbuffered so kills leave their progress trail). An 8-angle
+  /code-review round fixed the "rarer than 100.0%" rounding, the elite-tail standing
+  cap/monotonicity, standing-card queue destruction, pin-button leakage, Gz-on-own-
+  earns / modified clicks / channel allowlist, and the `why` scope mismatch — plus the
+  user-caught Gz click-dead bug (`x and s:match(...)` truncates a multi-capture match
+  to its first value; the channel never arrived). Options page: data strap rides the
+  "How Rare?" title. **SIGNED OFF and committed.**
 
 ## Previous theme — shipped
 
@@ -523,4 +363,5 @@ Two independent tracks; the surfaces depend only on Track 1.
 
 ## Delete me
 
-Delete when this theme's surfaces ship (or the theme is re-scoped).
+Delete when v1 ships (the release train above completes) — the durable design
+detail worth keeping (instance track, distribution model) moves to its own spec then.
