@@ -23,3 +23,4 @@ Tooltip.lua
 Toast.lua
 Chat.lua
 AchievementUI.lua
+CharacterSheet.lua

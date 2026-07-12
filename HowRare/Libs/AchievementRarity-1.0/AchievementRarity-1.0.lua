@@ -34,7 +34,7 @@ if not lib then return end -- the data file registers the library; nothing to at
 -- with the newest data AND the newest API, each arbitrated independently. Bump API_MINOR
 -- on any change to the methods below; `_apiMinor` is owned solely here (the data file
 -- never sets it). With a single consumer this never fires.
-local API_MINOR = 3 -- 3: junk tier lightened to 0.75 grey; 2: RankAtEarn all-accounts re-base + explicit-region scopes
+local API_MINOR = 4 -- 4: collection standing (CollectionWeight/Score/Standing/Tier); 3: junk 0.75 grey; 2: RankAtEarn re-base
 if lib._apiMinor and lib._apiMinor >= API_MINOR then return end
 lib._apiMinor = API_MINOR
 
@@ -212,6 +212,91 @@ function lib:RankAtEarn(achievementID, earnTime, scope)
     return earnerPct * rarity / 100, earnerPct
 end
 
+--[[ Collection standing — "how rare are you": a rarity-weighted score for a player's
+     whole collection, placed against the shipped distribution of the same score across
+     every tracked account. The score rule: each earned achievement contributes
+     -log2(its global attainment share) — "surprise" points, so every earn counts, rare
+     earns count more, and no single achievement can dominate (a straight 1/share
+     would be winner-take-all). The data file ships, per scope, the score at each
+     lib.standingLadder percentile of tracked accounts, computed by the same producer
+     over the same snapshot counts — so a score recomputed here from lib.counts lands
+     on that distribution exactly. Raw layer; the tier verdict below is opinion. ]]
+
+local LN2 = math.log(2)
+
+-- The score contribution of one achievement (its "surprise" in bits): -log2(global
+-- attainment share). Always the GLOBAL column — corpus scores are computed with one
+-- weight set so they're comparable across scopes; the scope choice belongs to the
+-- standing lookup, not the weights. Derived through GetRarity (the raw numeric basis
+-- everything else builds on) rather than a parallel counts/denominator read, so a
+-- change to the packed layout or denominator rules can never give weights a second,
+-- drifting derivation. nil when there is nothing to weigh: off-snapshot, or zero
+-- recorded global holders.
+function lib:CollectionWeight(achievementID)
+    local pct = self:GetRarity(achievementID, "global")
+    if not pct or pct == 0 then
+        return nil
+    end
+    return -math.log(pct / 100) / LN2
+end
+
+-- A player's whole-collection score: the summed CollectionWeight of every snapshot
+-- achievement for which isEarned(achievementID) returns true. The loop lives here so
+-- the score rule stays in one place across consumers; the earned test is a callback so
+-- the library stays free of game-API calls (How Rare? passes its completed check).
+-- Cold-path: one isEarned call per snapshot achievement (~8k) — commands and cards,
+-- never per-event surfaces.
+function lib:CollectionScore(isEarned)
+    local total = 0
+    for id in pairs(self.counts) do
+        if isEarned(id) then
+            total = total + (self:CollectionWeight(id) or 0)
+        end
+    end
+    return total
+end
+
+-- Where a collection score stands among tracked accounts under a scope: the share
+-- (0–100) of accounts whose score falls below it — "your achievements are rarer than
+-- N% of accounts". Interpolated between the shipped ladder breakpoints, so the output
+-- is continuous. At/above the recorded top the share is everyone-but-you (never a
+-- flat 100 — you can't out-rank yourself). nil when this data file (or this scope)
+-- carries no standing distribution.
+function lib:CollectionStanding(score, scope)
+    local region = scopeRegion(scope)
+    local bps = self.standing and self.standing[REGION_INDEX[region]]
+    if not bps or #bps == 0 then
+        return nil
+    end
+    local ladder = self.standingLadder
+    local n = #bps
+    if score < bps[1] then
+        return 0
+    end
+    -- The ceiling: in a finite population you can only ever out-score everyone
+    -- ELSE — never 100. Applied to every exit below, including the interpolated
+    -- ones: the last ladder segment's upper anchor is 100, so near-top scores
+    -- would otherwise interpolate ABOVE this ceiling — reading higher than the
+    -- top scorer itself and breaking monotonicity right where it matters most.
+    local denom = self.accounts[region]
+    local cap = (denom and denom > 1) and (100 - 100 / denom) or ladder[n]
+    if score >= bps[n] then
+        return cap
+    end
+    for i = 1, n - 1 do
+        local hi = bps[i + 1]
+        if score < hi then
+            local lo = bps[i]
+            local pLo, pHi = ladder[i], ladder[i + 1]
+            if hi == lo then
+                return math.min(pHi, cap) -- a flat step (tied scores); higher share
+            end
+            return math.min(pLo + (pHi - pLo) * (score - lo) / (hi - lo), cap)
+        end
+    end
+    return cap -- unreachable (score < bps[n] always brackets); the safe exit
+end
+
 --[[ Opinion layer — house style, optional and overridable. ]]
 
 -- Rarity tiers, rarest first — the loot-quality idiom: the rarer the achievement, the higher
@@ -269,6 +354,22 @@ function lib:GetColor(achievementID, scope)
         return nil
     end
     return c.r, c.g, c.b
+end
+
+-- The tier verdict for a whole collection — "your achievements are Epic" — banding a
+-- CollectionStanding through the SAME tier scale as single achievements: the share of
+-- accounts scoring at/above you plays the role the attainment share plays for one
+-- achievement (top 0.1% of accounts = legendary, top 5% = epic, …). Returns the tier
+-- name, the standing (the "rarer than N%" share) it was banded from, and the tier's
+-- r, g, b; nil when this data file carries no standing distribution.
+function lib:CollectionTier(score, scope)
+    local standing = self:CollectionStanding(score, scope)
+    if not standing then
+        return nil
+    end
+    local t = tierForPct(100 - standing)
+    local c = tierColor(t)
+    return t.name, standing, c.r, c.g, c.b
 end
 
 -- The tier bands, rarest first: { name, maxPct, r, g, b } — for consumers that want to band

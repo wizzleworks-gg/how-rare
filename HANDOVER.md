@@ -16,7 +16,86 @@ Builds on the architecture doc (`../gratz-addon/docs/addon-architecture.md`): §
 addon), §11 (naming / the toast as the outbound surface), and the reverted hover probe
 (`../gratz-addon/docs/dungeon-raid-hover-probe.md`).
 
-## SESSION STATE — 2026-07-10: first in-game verify done → fix round BUILT (uncommitted); NEXT is re-verify
+## SESSION STATE — 2026-07-11: v1 headliners BUILT (uncommitted) — "How rare are YOU?" + Gz!
+
+The killer-feature decision landed (user-approved): **both** go in v1.
+
+- **Collection standing ("your achievements are Epic" — user's wording, "achievements"
+  not "collection" in copy).** Score = Σ −log2(global attainment share) over earned
+  snapshot achievements ("surprise" points); the corpus distribution ships as
+  percentile→score breakpoints. Chain built end-to-end: counter `rarity_score` standing
+  metric (rides the existing rank pass — weights need finished counts; deci-point ints,
+  `SCORE_SCALE=10`; eligibility = the SAME live∧Blizzard-indexed set the export ships —
+  lockstep filters, flagged as consistency debt) → export `standingLadder`/`standing`
+  (points, ÷10) → library `CollectionWeight/Score/Standing/Tier` (API_MINOR 4; tier =
+  the loot bands applied to top-% of accounts) → addon `G.CollectionVerdict` +
+  `/howrare me` (verdict + score print, pinnable standing card off the toast frame —
+  `PopulateStanding`, `ShowSample` generalised to a fill-fn, `PinButtons` extracted).
+  Validated on dev end-to-end (counter run + export show plausible curves).
+  **SEQUENCING:** prod has no `rarity_score` rows until the new counter runs there
+  (gratz push → next 05:30 cron), so `/howrare me` on the current embed prints the
+  score + "no standing in this snapshot" line; the REAL publish (re-export + re-embed
+  with standing) happens after that cron tick. Library + addon degrade gracefully.
+- **Gz! (click-to-send congratulation).** `[Gz!]` affordance (gold, locally-visible,
+  `garrmission:`-typed link — unknown link types aren't clickable; that's the
+  established addon-space carrier) appended to every enriched announcement; click sends
+  "Gz! [link]" (+ " — only 0.4% of EU accounts have this!" on IsRareTier earns) into
+  the ORIGIN channel (guild→GUILD, nearby→SAY; the click is the hardware event SAY
+  needs). Strictly never-auto; 30s per-(achievement,channel) cooldown; sent line
+  deliberately UNBRANDED (conventions updated in CLAUDE.md). Rides the "chat" toggle.
+- gratz BACKLOG gained the profile-page surfacing of the same standing (reads the same
+  `population_standing` metric; tier framing over raw rank).
+- **Open consistency debt (flagged via TECH_DEBT hook, user to decide):** the
+  live∧Blizzard-indexed "shipped set" filter now exists in THREE expressions (export
+  counts query, export ranks query, counter score-eligibility) + the ×10/÷10 scale pair
+  (counter/export). Candidate fix: one `v_shipped_achievements` view + a scale row in a
+  meta table; deferred unless the user opts in.
+
+**Also built same day (user-approved design): the character-sheet row**
+(`CharacterSheet.lua`, `characterSheet` option, default on): "Achievements — <Tier>"
+as a stat-style row at the BOTTOM of the Character Info stats pane (own frame, no
+Blizzard stat internals touched; row geometry constants are eyeball-first-cut), full
+verdict on hover. Verdict cached (scope-keyed; invalidated on ACHIEVEMENT_EARNED),
+refreshed via the master/scope/toggle Settings callbacks. Hidden until the snapshot
+ships standing. Own sheet only — inspect can't read another player's earned list.
+
+**gratz pushed + deployed 2026-07-11 (both rounds):** the standing metric + the
+consistency fix (migration 083 `v_shipped_achievements` + `standing_meta` — applied on
+prod, view verified returning 8,349). The 05:30 cron next computes the distribution.
+
+**2026-07-12: standing data LIVE + first-verify fixes.** The 05:30 cron OOM'd twice at
+the 5G cap — (1) deci-point buckets made ~830K accounts ~830K histogram values
+(SCORE_SCALE 10→1, whole points); (2) the per-rep scores dict grew INSIDE
+rank_histogram's churn loop, pinning the heap against the per-chunk malloc_trim
+(preallocated flat array + upfront key→slot index; the "no long-lived allocation in
+the churn window" rule, now documented in the function). cron-rarity.sh runs Python
+unbuffered so a SIGKILL leaves its progress prints. Third run clean (~15K buckets per
+region); fresh prod snapshot (asOf 2026-07-12, all three standing scopes) exported +
+re-embedded; harness passes on the real file. From the user's first in-game pass:
+character-sheet row now gated to **Uncommon or better** (junk/common there reads as an
+insult; /howrare me stays honest for all tiers), and the toast's brand mark moved to
+its **own line** below the footer (a long name · five-digit score · date footer needs
+the full width).
+
+**SIGNED OFF 2026-07-12** after the full in-game pass: me verdict + card, character
+sheet, Gz! (a click-dead bug found by the user's manual test — `local a, b = x and
+s:match(...)` truncates a multi-capture match to its first value, so the channel never
+arrived; fixed, plus an 8-angle /code-review round that fixed: the "rarer than 100.0%"
+display rounding, the standing cap/monotonicity at the elite tail, the standing card
+destroying live toast queues, pin-button leakage onto real toasts, Gz on own earns /
+modified clicks / channel allowlist, the `why` scope mismatch, a shared verdict cache
+in Core with coalesced earn invalidation, and one-owner helpers for tier labels /
+standing format / notability). Options page restructured on user feedback: data strap
+("<denominator> · <asOf> · Data by wizzleworks") rides the page title; bottom block is
+the two-sentence methodology only; checkbox label "Achievements tier on character".
+
+**NEXT — the release train (the session-plan remainder):** one-command publish script
+(tunnel → export → commit/push library → re-embed → commit addon), CurseForge admin
+(create both projects, set CF_API_KEY/CF_PROJECT_ID, repo visibility decision, library
+release workflow), library CHANGELOG "Unreleased" → version + TOC version refresh,
+then tag v1.0.0. Instance rarity (Track 3) stays its own future session.
+
+## Previous session state — 2026-07-10: first in-game verify done → fix round SHIPPED (committed 2026-07-11)
 
 The 2026-07-10 in-game pass verified panel rows, chat (partially — no live broadcast seen
 yet), toast, options, and `/howrare top`; it found that the rank line never showed because

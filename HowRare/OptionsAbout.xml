@@ -7,21 +7,39 @@
 	     returns no extent (verified against Blizzard_SettingsList.lua), so the
 	     height here IS the block's footprint. Mixin lives in Options.lua (loaded
 	     first); Init fills parentKey Text. spacing = the inter-line gap. -->
-	<!-- Sized to the methodology paragraph's usual two wrapped lines + blank + the
-	     one-line data/credit footer (~4 rendered lines at ~20px each, after the
-	     y="-28" top inset that sets the text one line down from the last control):
-	     the standard (not Small) white font with relaxed line spacing; Options.lua
-	     composes the text as one auto-wrapping paragraph + footer. Tune Size y /
+	<!-- Sized to the methodology paragraph's usual two wrapped lines (~20px each,
+	     after the y="-28" top inset that sets the text one line down from the last
+	     control): the standard (not Small) white font with relaxed line spacing;
+	     Options.lua composes the text as one auto-wrapping paragraph (the data/
+	     credit line lives at the page top, HowRareHeaderLineTemplate). Tune Size y /
 	     spacing / the top inset together if the fit is off — too tall scrolls the
 	     settings panel, too short overflows the block's slot. -->
 	<Frame name="HowRareAboutTemplate" virtual="true" mixin="HowRareAboutMixin">
-		<Size y="112"/>
+		<Size y="72"/>
 		<Layers>
 			<Layer level="ARTWORK">
 				<FontString parentKey="Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP" spacing="6">
 					<Anchors>
 						<Anchor point="TOPLEFT" x="7" y="-28"/>
 						<Anchor point="TOPRIGHT" x="-16" y="-28"/>
+					</Anchors>
+				</FontString>
+			</Layer>
+		</Layers>
+	</Frame>
+
+	<!-- The one-line data/credit strap under the page's "How Rare?" title:
+	     denominator · snapshot date · credit, same standard white font as the
+	     about paragraph (deliberately NOT a section-header font). First element
+	     in the layout, so it reads as part of the header. -->
+	<Frame name="HowRareHeaderLineTemplate" virtual="true" mixin="HowRareAboutMixin">
+		<Size y="28"/>
+		<Layers>
+			<Layer level="ARTWORK">
+				<FontString parentKey="Text" inherits="GameFontHighlight" justifyH="LEFT" justifyV="TOP">
+					<Anchors>
+						<Anchor point="TOPLEFT" x="7" y="-6"/>
+						<Anchor point="TOPRIGHT" x="-16" y="-6"/>
 					</Anchors>
 				</FontString>
 			</Layer>

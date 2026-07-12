@@ -275,6 +275,24 @@ function G.FormatPctFine(pct)
     return "<0.1%"
 end
 
+-- Display form of a standing share ("rarer than N%"): one decimal normally, two at
+-- the extreme top — where a bare %.1f would round the library's never-100 ceiling
+-- up to a flat "100.0%", claiming the player out-ranks themselves on the exact
+-- card built to be screenshotted. The min() keeps even 99.999… at a truthful
+-- "99.99%". The one formatter for every standing display (command, card, tooltip).
+function G.FormatStandingPct(standing)
+    if standing >= 99.95 then
+        return string.format("%.2f%%", math.min(standing, 99.99))
+    end
+    return string.format("%.1f%%", standing)
+end
+
+-- A tier name as display copy ("epic" → "Epic") — the one owner of tier
+-- capitalisation across surfaces.
+function G.TierLabel(tier)
+    return (tier:gsub("^%l", string.upper))
+end
+
 -- The attainment as a raw percent (0–100) under a scope (default: the user's saved
 -- scope), or nil when the achievement isn't in the library's snapshot.
 function G.RarityValue(achievementId, scope)
@@ -340,6 +358,11 @@ end
 -- share ("first 3%"; fine-formatted — rank shares live at the rare end, where "<1%"
 -- would flatten real differences). earnTime (optional) threads a caller's
 -- already-derived earn date through, like EarnedAgo.
+-- Besides the phrase, the count form also returns its pieces around the "~"
+-- (pre, post) so a typography-conscious consumer (the toast's nudged tilde) can
+-- compose structurally instead of parsing the rendered string — a wording edit
+-- here can then never silently break the card's tilde alignment. The percent
+-- form returns just the phrase.
 function G.RankPhrase(achievementId, scope, earnTime)
     local pct, earnerPct = G.RankAtEarn(achievementId, scope, earnTime)
     if not pct or earnerPct > G.RANK_EARLY_MAX then
@@ -347,7 +370,8 @@ function G.RankPhrase(achievementId, scope, earnTime)
     end
     local before = G.CountForPct(pct, scope)
     if before < G.CountFormMax() then
-        return "first ~" .. BreakUpLargeNumbers(before)
+        local n = BreakUpLargeNumbers(before)
+        return "first ~" .. n, "first ", n
     end
     return "first " .. G.FormatPctFine(pct)
 end
@@ -383,17 +407,61 @@ function G.RarityColor(achievementId, scope)
     return r, g, b
 end
 
--- "rrggbb" hex of the same tier colour, for inline |cff..|r colouring in strings;
--- brand gold when off-snapshot. Built from the same r,g,b RarityColor uses, so the
--- inline and SetTextColor paths stay byte-identical.
+-- r,g,b (0–1) as a "rrggbb" hex for inline |cff..|r colouring — the one conversion,
+-- so inline-string and SetTextColor paths of the same colour stay byte-identical.
+function G.RGBHex(r, g, b)
+    return string.format("%02x%02x%02x",
+        math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+end
+
+-- "rrggbb" hex of an achievement's tier colour; brand gold when off-snapshot.
 function G.RarityHex(achievementId, scope)
     local r, g, b = AR:GetColor(achievementId, scope or G.Scope())
     if not r then
         return GOLD_HEX
     end
-    return string.format("%02x%02x%02x",
-        math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
+    return G.RGBHex(r, g, b)
 end
+
+-- "EU accounts" / "accounts worldwide" — the scope-region population noun a sentence
+-- ends on, following the user's chosen scope like every figure. Shared by the toast's
+-- rarity line, the standing card/command, and the outbound Gz! reply.
+function G.ScopeNoun(noun, scope)
+    local region = G.ScopeRegion(scope)
+    return region == "global" and (noun .. " worldwide") or (region:upper() .. " " .. noun)
+end
+
+-- Your whole-collection verdict, from the library under the saved scope: the
+-- collection score (surprise points over the shipped snapshot), and — when this
+-- snapshot ships a standing distribution — the tier verdict ("epic"), the standing
+-- (rarer than N% of tracked accounts), and the tier colour. tier is nil (score
+-- still returned) on a data file without standing.
+--
+-- CACHED: the underlying scan (one completion check per ~8k snapshot achievements)
+-- is far too heavy to repeat per surface, and three surfaces read the verdict
+-- (/howrare me, the standing card, the character-sheet row). Keyed by scope — the
+-- score is scope-blind but the standing/tier are not. Invalidated on
+-- ACHIEVEMENT_EARNED by CharacterSheet's event frame (the addon's one earn
+-- listener for verdict state) via InvalidateCollectionVerdict.
+local verdictCache = {}
+function G.CollectionVerdict(scope)
+    scope = scope or G.Scope()
+    local v = verdictCache[scope]
+    if not v then
+        local score = AR:CollectionScore(G.SelfCompleted)
+        v = { score, AR:CollectionTier(score, scope) }
+        verdictCache[scope] = v
+    end
+    return v[1], v[2], v[3], v[4], v[5], v[6]
+end
+
+function G.InvalidateCollectionVerdict()
+    wipe(verdictCache)
+end
+
+-- The one-line score explainer, shared verbatim by /howrare me and the
+-- character-sheet tooltip so the two can't drift.
+G.SCORE_NOTE = "every earned achievement adds points for how surprising it is to hold; rare earns add more."
 
 -- One lookup, both outputs a list row needs: the formatted attainment string (or
 -- nil, off-snapshot) and the tier colour r, g, b (brand gold off-snapshot). Saves
@@ -408,13 +476,20 @@ function G.RarityTextAndColor(achievementId, scope)
     return text, r, g, b
 end
 
--- Whether an achievement's tier is "rare or rarer" — the addon's ONE judgment of
--- which earns are notable (worth an auto-screenshot, worth the tier-tinted toast
--- flourish), held in a single predicate so the two can't drift apart. Returns the
--- tier as a second value for callers that also need it.
+-- Whether a tier NAME is "rare or rarer" — the addon's ONE judgment of notability
+-- (worth an auto-screenshot, worth the tier-tinted flourish, worth the Gz! rarity
+-- beat), held in a single predicate so no consumer can drift. Name-level so both
+-- id-keyed callers (via IsRareTier) and verdict-keyed ones (the standing card)
+-- share the same boundary.
+function G.IsRareTierName(tier)
+    return tier == "legendary" or tier == "epic" or tier == "rare"
+end
+
+-- The id-keyed form: resolves the achievement's tier, then applies the one
+-- boundary above. Returns the tier as a second value for callers that need it.
 function G.IsRareTier(achievementId, scope)
     local tier = G.RarityTier(achievementId, scope)
-    return tier == "legendary" or tier == "epic" or tier == "rare", tier
+    return G.IsRareTierName(tier), tier
 end
 
 -- Whether an earn/preview of this achievement should auto-screenshot, per the

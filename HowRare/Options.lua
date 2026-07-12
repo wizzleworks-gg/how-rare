@@ -9,6 +9,7 @@ local DEFAULTS = {
     chat = true, -- rarity + your status on incoming achievement announcements
     panel = true, -- the rarity % painted on achievement-panel rows
     rowTooltip = true, -- hover tooltip on achievement-panel rows (Blizzard shows none)
+    characterSheet = true, -- "Achievements — <tier>" row on the Character Info stats pane
     titleColor = true, -- tier-colour panel-row titles by rarity
     toast = true, -- companion toast on ACHIEVEMENT_EARNED (replaces Blizzard's alert)
     screenshot = "off", -- auto-screenshot mode: "off" / "rare" (rare-and-rarer tiers) / "all"
@@ -35,6 +36,24 @@ local function RegisterSettings()
     local category, layout = Settings.RegisterVerticalLayoutCategory("How Rare?")
     G.settingsCategory = category
 
+    -- The data strap, first element on the page so it rides the "How Rare?" title:
+    -- denominator · snapshot date · credit (the lowercase display wordmark in brand
+    -- gold; running prose keeps "the Wizzleworks"). Same small white font as the
+    -- about paragraph at the bottom — a fact line, not a header.
+    local meta = G.AR:GetMeta()
+    local scope
+    if G.region == "global" then
+        scope = string.format("%s active accounts worldwide",
+            BreakUpLargeNumbers(meta.accounts.global))
+    else
+        scope = string.format("%s active %s accounts",
+            BreakUpLargeNumbers(meta.accounts[G.region]), G.region:upper())
+    end
+    if Settings.CreateElementInitializer then
+        layout:AddInitializer(Settings.CreateElementInitializer("HowRareHeaderLineTemplate",
+            { text = string.format("%s · %s · Data by |cffffd100wizzleworks|r", scope, meta.asOf) }))
+    end
+
     local function AddCheckbox(key, label, tooltip)
         local setting = Settings.RegisterAddOnSetting(
             category, "HOWRARE_" .. key:upper(), key, HowRareDB,
@@ -59,10 +78,13 @@ local function RegisterSettings()
         return master:GetValue()
     end
     -- Re-apply each automatic surface the moment the master flips: suppress or
-    -- restore Blizzard's alert. Tooltip / chat / panel rarity read the master at
-    -- use-time, so need no callback.
+    -- restore Blizzard's alert, and re-dress the character-sheet row. Tooltip /
+    -- chat / panel rarity read the master at use-time, so need no callback.
     Settings.SetOnValueChangedCallback("HOWRARE_ENABLED", function()
         G.ApplyToastMode()
+        if G.RefreshCharacterSheet then
+            G.RefreshCharacterSheet()
+        end
     end)
 
     -- Per-surface switches, nested under the master: each automatic surface can be
@@ -93,6 +115,17 @@ local function RegisterSettings()
     local _, rowTipInit = AddCheckbox("rowTooltip", "Tooltip on achievement rows",
         "Show the standard achievement tooltip — with its rarity — when hovering achievement-panel rows. Blizzard shows none there by itself. Turn this off if you prefer another addon's tooltip there.")
     DependOn(rowTipInit, masterInit, MasterOn)
+
+    -- The Character Info stats-pane row (CharacterSheet.lua). Refresh immediately on
+    -- flip so the row appears/disappears without reopening the sheet.
+    local _, sheetInit = AddCheckbox("characterSheet", "Achievements tier on character",
+        "Add an Achievements row to the Character Info stats pane showing your collection's tier — hover it for your full standing. Appears once your collection rates Uncommon or better (and this data snapshot ships a standing distribution).")
+    DependOn(sheetInit, masterInit, MasterOn)
+    Settings.SetOnValueChangedCallback("HOWRARE_CHARACTERSHEET", function()
+        if G.RefreshCharacterSheet then
+            G.RefreshCharacterSheet()
+        end
+    end)
 
     local _, toastInit = AddCheckbox("toast", "Earned toast",
         "Replace Blizzard's achievement alert with a toast that adds the achievement's rarity. Turn off to restore Blizzard's own alert.")
@@ -178,11 +211,14 @@ local function RegisterSettings()
             return container:GetData()
         end, "Whether rarity is measured against your own region or the whole tracked population. Applies everywhere — tooltips, panel rows, chat, and the toast.")
     end
-    -- Repaint the visible panel rows the moment scope flips, so their %/colours
-    -- update without waiting for the list to re-fill.
+    -- Repaint the visible panel rows (and the character-sheet verdict, whose cache
+    -- is scope-keyed) the moment scope flips, without waiting for a re-fill.
     Settings.SetOnValueChangedCallback("HOWRARE_SCOPE", function()
         if G.RepaintRows then
             G.RepaintRows()
+        end
+        if G.RefreshCharacterSheet then
+            G.RefreshCharacterSheet()
         end
     end)
 
@@ -208,35 +244,16 @@ local function RegisterSettings()
         end, "When an achievement's holder club — or the number of accounts that earned it before you — is smaller than this, show the count (\"one of ~830\", \"first ~230\") instead of a percentage.")
     end
 
-    -- The rarity "about" section: what the two numbers mean, the live denominator +
-    -- snapshot date, and the data attribution. The user opted into this page, so it's
-    -- the home for the wizzleworks credit — the lowercase display wordmark in brand
-    -- gold (like the site's "gratz!", the stylised form is for display surfaces;
-    -- running prose keeps "the Wizzleworks"). One compact small-font paragraph via
-    -- our own element template (OptionsAbout.xml + HowRareAboutMixin below): stock
-    -- section headers are 45px each and don't wrap, so line-per-header scrolled the
-    -- panel. Guarded like the other optional Settings APIs; the fallback is a single
-    -- credit header, not the full text.
-    local meta = G.AR:GetMeta()
-    local scope
-    if G.region == "global" then
-        scope = string.format("%s active accounts worldwide",
-            BreakUpLargeNumbers(meta.accounts.global))
-    else
-        scope = string.format("%s active %s accounts",
-            BreakUpLargeNumbers(meta.accounts[G.region]), G.region:upper())
-    end
-    -- A two-sentence methodology paragraph, wrapped by the FontString itself (no
-    -- hand-placed line breaks — natural wrapping fills each line to the template's
-    -- real width, so the block renders in the fewest lines the panel allows), then
-    -- a set-off one-line footer carrying the denominator, the snapshot date, and
-    -- the credit as dot-chained beats.
-    local about = table.concat({
-        "Rarity is the share of active accounts that hold an achievement. "
-            .. "\"First N%\" is how early you earned it, shown when you were notably early.",
-        "", -- blank line sets the footer off from the methodology
-        string.format("Based on %s · %s · Data by |cffffd100wizzleworks|r", scope, meta.asOf),
-    }, "\n")
+    -- The methodology footnote: what the two numbers mean, as one two-sentence
+    -- paragraph wrapped by the FontString itself (no hand-placed line breaks —
+    -- natural wrapping fills each line to the template's real width). The
+    -- denominator/date/credit strap lives at the page TOP (above). Our own element
+    -- template (OptionsAbout.xml + HowRareAboutMixin below): stock section headers
+    -- are 45px each and don't wrap, so line-per-header scrolled the panel. Guarded
+    -- like the other optional Settings APIs; the fallback is a single credit
+    -- header, not the full text.
+    local about = "Rarity is the share of active accounts that hold an achievement. "
+        .. "\"First N%\" is how early you earned it, shown when you were notably early."
     if Settings.CreateElementInitializer then
         layout:AddInitializer(Settings.CreateElementInitializer(
             "HowRareAboutTemplate", { text = about }))
@@ -364,8 +381,11 @@ local function ExplainWhy(rest)
     end
     local region = G.ScopeRegion()
     local meta = G.AR:GetMeta()
+    -- GetCount takes the SAME saved scope as the % above it — an unscoped call
+    -- would read the home-region column while the % and denominator use the
+    -- saved scope, and the three numbers would contradict each other.
     print(string.format("  rarity: |cff%s%s|r — one of ~%s of %s active accounts (%s scope) · tier %s",
-        G.RarityHex(id), G.FormatPctFine(pct), BreakUpLargeNumbers(G.AR:GetCount(id)),
+        G.RarityHex(id), G.FormatPctFine(pct), BreakUpLargeNumbers(G.AR:GetCount(id, G.Scope())),
         BreakUpLargeNumbers(meta.accounts[region]),
         region == "global" and "global" or region:upper(), G.RarityTier(id) or "?"))
     if not G.SelfCompleted(id) then
@@ -404,6 +424,30 @@ local function ExplainWhy(rest)
     end
 end
 
+-- /howrare me — the addon's title question, answered for the player: the whole-
+-- collection standing. Prints the verdict + the numbers behind it, then pins the
+-- shareable card (G.ShowStandingCard). The score alone still prints on a data file
+-- without a standing distribution, with the explanation.
+local function PrintMe()
+    local score, tier, standing, r, g, b = G.CollectionVerdict()
+    local scoreStr = BreakUpLargeNumbers(math.floor(score + 0.5))
+    if not tier then
+        G.Print(string.format("collection score ~%s — but this data snapshot ships no "
+            .. "standing distribution to place it against; it arrives with the next data refresh.", scoreStr))
+        return
+    end
+    -- Junk is never said to a player's face — the bottom tier leads with the
+    -- honest number, no tier noun (the standing card's title does the same).
+    local verdict = tier == "junk" and "your achievements are rarer than"
+        or string.format("your achievements are |cff%s%s|r — rarer than",
+            G.RGBHex(r, g, b), G.TierLabel(tier))
+    G.Print(string.format("%s %s of %s (top %s).",
+        verdict, G.FormatStandingPct(standing), G.ScopeNoun("accounts"),
+        G.FormatPctFine(100 - standing)))
+    print("  collection score ~" .. scoreStr .. " — " .. G.SCORE_NOTE)
+    G.ShowStandingCard()
+end
+
 -- Keybinding label for the WoW Key Bindings screen. The action is declared in
 -- Bindings.xml, which the client auto-loads from the addon root — it must NOT be
 -- listed in the .toc (the general XML loader would otherwise mis-parse it and warn
@@ -420,6 +464,8 @@ SlashCmdList.HOWRARE = function(msg)
         PrintStatus()
     elseif cmd == "top" then
         PrintTop(rest)
+    elseif cmd == "me" then
+        PrintMe()
     elseif cmd == "why" then
         ExplainWhy(rest)
     elseif cmd == "toast" then

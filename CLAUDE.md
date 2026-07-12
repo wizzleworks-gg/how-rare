@@ -37,7 +37,10 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
   - `Api.lua` — `HowRareAPI`, a thin back-compat shim forwarding to the library; new
     integrators should use `LibStub("AchievementRarity-1.0")` directly.
   - `Tooltip.lua` / `Chat.lua` / `AchievementUI.lua` — the rarity surfaces
-    (achievement tooltips, incoming chat announcements, panel-row paint + hover).
+    (achievement tooltips, incoming chat announcements + the click-to-send Gz!
+    reply, panel-row paint + hover).
+  - `CharacterSheet.lua` — the collection verdict ("Achievements — Epic") as a
+    stat-style row on the Character Info stats pane, tooltip on hover.
   - `Toast.lua` — the earned toast (replaces Blizzard's alert while on) + the
     share/showcase paths.
   - `Options.lua` — SavedVariables defaults, the Settings panel, the `/howrare`
@@ -51,8 +54,15 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
 
 - SavedVariables table: `HowRareDB`. Global debug handle: `HowRare` (e.g.
   `/dump HowRare.AR:GetMeta()`, or `/dump LibStub("AchievementRarity-1.0"):GetMeta()`).
-- Slash: `/howrare` and `/hr` (`status`, `top [n]`, `why <link|id>`, `toast [n|pin]`,
-  `share`, `debug`; bare opens options).
+- Slash: `/howrare` and `/hr` (`status`, `top [n]`, `me`, `why <link|id>`,
+  `toast [n|pin]`, `share`, `debug`; bare opens options).
+- **Outbound chat (Gz!) is strictly click-to-send and unbranded.** The `[Gz!]`
+  affordance on enriched announcements of OTHERS' earns (Chat.lua; never on your
+  own) is the addon's ONLY outbound surface besides toast screenshots; nothing is
+  ever sent without a plain (unmodified) click (the no-spam rule), the reply maps
+  guild earns → GUILD and nearby earns → SAY (the send boundary allowlists exactly
+  those two), and the sent line carries no addon branding — the rarity figure is
+  the curiosity hook, and a congratulation ending in an ad reads as spam.
 - **Naming: brand headline "How Rare?", descriptive subtitle for discovery,
   the Wizzleworks as data attribution.** The CurseForge/TOC title is **"How Rare? —
   Achievement Rarity"**: "How Rare?" is the brand (and the question a player asks on

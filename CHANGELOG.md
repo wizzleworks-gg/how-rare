@@ -17,3 +17,13 @@ detail view (tier, every region, your earn date); raw counts on small-club toolt
 2,500); `/howrare top` (your rarest earned, as hoverable links) and
 `/howrare why` (explains every number and every suppression for one achievement); and a
 per-surface toggle for each of tooltips, chat, panel rows, row tooltips, and the toast.
+
+And two headliners: **How rare are YOU?** — `/howrare me` scores your whole collection
+(every earn adds points for how surprising it is to hold) and reads it out against all
+tracked accounts — "your achievements are **Epic** — rarer than 96% of EU accounts" —
+with a pinnable, screenshot-ready card, and the same verdict as an Achievements row on
+the Character Info stats pane (hover for the full standing; shown from Uncommon up). And **Gz!** — a click-only
+button on enriched announcements of others' earns that sends a one-line congratulation
+back where it came from (guild chat, or /say for nearby earns), with the rarity attached
+on notable earns — so non-users see the numbers too. Nothing is ever sent without your
+click.

@@ -55,7 +55,7 @@ TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Achievement, functi
         local tier = G.RarityTier(data.id)
         if tier then
             parts[#parts + 1] = string.format("|cff%s%s|r",
-                G.RarityHex(data.id), tier:gsub("^%l", string.upper))
+                G.RarityHex(data.id), G.TierLabel(tier))
         end
         for _, col in ipairs(SCOPE_COLS) do
             local scopePct = G.RarityValue(data.id, col[2])

@@ -9,8 +9,9 @@ How Rare? is its reference consumer.
 ## Features
 
 One master switch (**How Rare? enabled**) governs every automatic surface, and each
-surface — tooltips, chat, panel rows, the toast — also has its own toggle. Open the
-options with `/howrare` or Settings → AddOns → How Rare?.
+surface — tooltips, chat, panel rows, row tooltips, the character-sheet row, the
+toast — also has its own toggle. Open the options with `/howrare` or Settings →
+AddOns → How Rare?.
 
 - **Rarity everywhere** — every achievement tooltip, incoming guild/nearby chat
   announcement, and Blizzard achievement-panel row gets its rarity (a tooltip
@@ -35,16 +36,34 @@ options with `/howrare` or Settings → AddOns → How Rare?.
   Auto-screenshot is a mode — off, rare earns only, or all earns. `/howrare
   share` (or the "Share rarest achievement" keybind) re-pops your rarest earned
   achievement as a shareable card.
+- **How rare are YOU?** — `/howrare me` answers the addon's title question for
+  your whole collection: every earned achievement adds points for how surprising
+  it is to hold (rare earns add more), and your total reads out against all
+  tracked accounts — "your achievements are **Epic** — rarer than 96% of EU
+  accounts", banded through the same loot-quality scale as single achievements,
+  with a pinnable card built to be screenshotted. The verdict also lives (on by
+  default, toggleable) as an Achievements row on the Character Info stats pane —
+  hover it for the full standing; it appears once your collection rates Uncommon
+  or better.
+- **Gz!** — enriched announcements of other players' earns get a small `[Gz!]`
+  button only you can see; clicking it sends a one-line congratulation back where
+  the announcement came from (guild chat for guild earns, local /say for nearby
+  ones), and on notable earns the rarity rides along — `Gz! [The Immortal] — only
+  0.4% of EU accounts have this!` — so the earner (and everyone else) sees the
+  number too. Strictly click-to-send: the addon never posts anything on its own.
 - **Commands** — `/howrare top [n]` lists your rarest earned achievements as
-  hoverable links; `/howrare why <link>` explains every number (and every
-  suppression) for one achievement; `/howrare status` prints data/version state.
-  Alt-click (configurable) any achievement row or chat link to preview its card.
+  hoverable links; `/howrare me` shows your collection standing; `/howrare why
+  <link>` explains every number (and every suppression) for one achievement;
+  `/howrare status` prints data/version state. Alt-click (configurable) any
+  achievement row or chat link to preview its card.
 
 ## Privacy
 
 Everything stays on your machine. The addon reads from Blizzard's own in-game API
-and keeps its settings in local SavedVariables — it never sends anything anywhere.
-(WoW addons can't reach the internet at runtime, and this one transmits nothing.)
+and keeps its settings in local SavedVariables. WoW addons can't reach the internet
+at runtime, and this one transmits nothing on its own — the single thing it ever
+sends is the one-line `[Gz!]` chat reply, only when you explicitly click it, into
+guild chat for a guild earn or local /say for a nearby one.
 
 ## How the data works
 

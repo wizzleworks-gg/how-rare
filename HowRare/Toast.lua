@@ -87,6 +87,21 @@ local TOAST_ART = "Interface\\AchievementFrame\\AchievementToast"
 
 local PumpQueue -- forward declaration (the release closure calls it before it's defined)
 
+-- Hide any pinned-card / move-mode buttons attached beneath a frame. Called from
+-- EVERY path that hides a card — including the frame's own click-to-dismiss
+-- (release) — because the pooled frame is reused for real earned toasts, and a
+-- button left "shown" would reappear beneath the next celebration.
+local function HideCardButtons(f)
+    if f.pinReplay then
+        f.pinReplay:Hide()
+        f.pinClose:Hide()
+    end
+    if f.moveLock then
+        f.moveLock:Hide()
+        f.moveReset:Hide()
+    end
+end
+
 -- One pooled toast frame: framed icon + points badge + header/name/rarity + a
 -- footer row (earn time · provenance) + the fade timer + the optional glow/sweep.
 -- The fader finishing (or a click) frees the slot and pumps the next queued id in.
@@ -181,14 +196,16 @@ local function CreateToastFrame(index)
     f.stampPost = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     f.stampPost:SetPoint("LEFT", f.stampTilde, "RIGHT", 0, STAMP_TILDE_NUDGE)
 
-    -- The card's one piece of identity: a small brand-gold "How Rare?" in the footer's
-    -- right corner. The toast is the addon's only surface that travels — it's built to
-    -- be screenshotted, and screenshots reach non-users — so unlike every other
-    -- (deliberately brand-silent) surface it must answer "what addon is that?", or the
-    -- share loop dead-ends at its last step. Anchored to the card corner; the y offset
-    -- eyeballs the stamp row's baseline (tune in-game if it sits off the row).
+    -- The card's one piece of identity: a small brand-gold "How Rare?" tucked in the
+    -- bottom-right corner, on its OWN line beneath the footer row. The toast is the
+    -- addon's only surface that travels — it's built to be screenshotted, and
+    -- screenshots reach non-users — so unlike every other (deliberately brand-silent)
+    -- surface it must answer "what addon is that?", or the share loop dead-ends at
+    -- its last step. Own line, not the footer's right end: a long footer (player
+    -- name · five-digit score · date) needs the full card width, and sharing the
+    -- line risked collision. The y offset is eyeballed to clear the border art.
     f.brand = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    f.brand:SetPoint("BOTTOMRIGHT", -EDGE_INSET, 24)
+    f.brand:SetPoint("BOTTOMRIGHT", -EDGE_INSET, 8)
     f.brand:SetText("How Rare?")
     f.brand:SetTextColor(unpack(G.GOLD))
 
@@ -240,9 +257,13 @@ local function CreateToastFrame(index)
     end
 
     -- Hide frees the slot (PumpQueue/Layout key off IsShown); pumping in turn
-    -- fills it from the queue and re-centres the survivors.
+    -- fills it from the queue and re-centres the survivors. Also tears down any
+    -- pin/move buttons (a pinned card can be dismissed by clicking its body —
+    -- the gesture every normal toast trains) and forgets the shown record.
     local function release(self)
         self.fader:Stop()
+        HideCardButtons(self)
+        self.rec = nil
         self:Hide()
         PumpQueue()
     end
@@ -276,13 +297,6 @@ local queue = {}
 -- count takes the rarity-tier colour, the rest stays gold. The remaining tiers keep
 -- the percentage and the off-snapshot fallback its grey note — both carry no tilde,
 -- so the prefix holds the whole line and the other two are empty.
--- "EU people" / "accounts worldwide" — the scope-region noun the rarity line ends
--- on. Follows the user's chosen scope (region/global) like every figure here.
-local function scopeFor(noun)
-    local region = G.ScopeRegion()
-    return region == "global" and (noun .. " worldwide") or (region:upper() .. " " .. noun)
-end
-
 local function RarityText(achievementId)
     local pct = G.RarityValue(achievementId)
     if not pct then
@@ -294,10 +308,10 @@ local function RarityText(achievementId)
         local n = BreakUpLargeNumbers(count)
         return "|cffffd100One of only |r",
             string.format("|cff%s~|r", hex),
-            string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, scopeFor("people"))
+            string.format("|cff%s%s|r|cffffd100 %s.|r", hex, n, G.ScopeNoun("people"))
     end
     return string.format(
-        "|cffffd100Held by |r|cff%s%s|r|cffffd100 of %s.|r", hex, G.FormatPct(pct), scopeFor("accounts")), "", ""
+        "|cffffd100Held by |r|cff%s%s|r|cffffd100 of %s.|r", hex, G.FormatPct(pct), G.ScopeNoun("accounts")), "", ""
 end
 
 -- Shrink the name in 1pt steps from NAME_MAX_PT toward NAME_MIN_PT until its
@@ -357,15 +371,15 @@ local function Populate(f, achievementId)
     -- get — so it rides the earn-date row it derives from, in brand gold, replacing the
     -- as-of note (the earn date already dates the card). A live earn's rank is ~100%
     -- → RankPhrase nil → the default as-of form, so this is data-driven, not path-keyed.
-    -- The earn date is dropped when unknown (e.g. an unearned preview). Split at a
-    -- count-form rank's "~" so the tilde piece sits nudged (see the frame's footer
-    -- pieces); each piece carries its own colour codes.
+    -- The earn date is dropped when unknown (e.g. an unearned preview). A count-form
+    -- rank arrives as structured pieces from RankPhrase (never parsed out of the
+    -- rendered phrase), so its "~" lands in the nudged tilde piece; each piece
+    -- carries its own colour codes.
     local earned = G.AchievementEarnedShort(achievementId)
-    local rank = G.RankPhrase(achievementId)
+    local rank, rankPre, rankPost = G.RankPhrase(achievementId)
     local pre, tilde, post
     if rank then
         local lead = earned and ("Earned " .. earned .. "  ·  ") or ""
-        local rankPre, rankPost = rank:match("^(.-)~(.+)$")
         if rankPre then
             pre = lead .. "|cffffd100" .. rankPre .. "|r"
             tilde = "|cffffd100~|r"
@@ -443,6 +457,7 @@ function PumpQueue()
         while not f:IsShown() and #queue > 0 do
             local rec = table.remove(queue, 1)
             if Populate(f, rec.id) then
+                f.rec = rec -- kept while showing: a sample takeover re-queues it
                 f:SetAlpha(1)
                 f:Show()
                 f.fader:Stop()
@@ -546,23 +561,32 @@ local function ShowcaseId()
     return best or fallback
 end
 
--- Show one persistent (non-fading) sample toast alone in slot 1: drop the queue,
--- stop every fader, clear the other slot, then populate and show id without arming
--- the fader. Shared by the showcase pin and the position mover. Returns the
--- frame, or nil if id is nil (no client-known achievement to show).
-local function ShowSample(id)
-    if not id then
-        return nil
-    end
+-- Show one persistent (non-fading) sample toast alone in slot 1 — WITHOUT
+-- destroying real earned toasts: a currently-showing earn is pushed back to the
+-- queue's front (its full record, so its capture flag rides along) and replays
+-- when the sample closes; queued earns are left queued. Every sample-close path
+-- pumps the queue, so nothing is stranded. fill(frame) dresses the card (an
+-- achievement Populate closure, or the standing card's populate) and returns
+-- false when it has nothing to show — then the slot is released and nil
+-- returned. Shared by the showcase pin, the standing card, and the position mover.
+local function ShowSample(fill)
     local f = frames[1]
-    wipe(queue)
     for _, g in ipairs(frames) do
         g.fader:Stop()
+        if g:IsShown() and g.rec then
+            table.insert(queue, 1, g.rec) -- displaced live earn replays after the sample
+            g.rec = nil
+        end
         if g ~= f then
             g:Hide()
         end
     end
-    Populate(f, id)
+    f.rec = nil -- a sample is not a queued earn; closing it must never re-queue it
+    if not fill(f) then
+        f:Hide()
+        Layout()
+        return nil
+    end
     f:SetAlpha(1)
     f:Show() -- no fader:Play(), so it persists
     Layout()
@@ -581,29 +605,99 @@ local function ToastButton(parent, side, width, text, onClick)
     return b
 end
 
+-- The Replay/Close pair under a pinned card — created once per frame, shown on
+-- every pin. Shared by the showcase pin and the standing card. Close pumps the
+-- queue: earns that arrived while the card was pinned show now, not at the next
+-- unrelated earn.
+local function PinButtons(f)
+    if not f.pinReplay then
+        f.pinReplay = ToastButton(f, "LEFT", 110, "Replay effect", function()
+            f.PlayEffects()
+        end)
+        f.pinClose = ToastButton(f, "RIGHT", 70, "Close", function()
+            HideCardButtons(f)
+            f:Hide()
+            PumpQueue()
+        end)
+    end
+    f.pinReplay:Show()
+    f.pinClose:Show()
+end
+
+-- The "how rare are YOU" card (G.ShowStandingCard, /howrare me): the toast frame
+-- re-dressed for the whole collection instead of one achievement — the agreed verdict
+-- wording as the title in the tier's colour, the standing as the rarity row, and a
+-- player · score · snapshot footer. No points shield (nothing to point at); the
+-- addon's own trophy icon. false when this data file ships no standing distribution.
+local STANDING_ICON = "Interface\\Icons\\Achievement_quests_completed_08"
+local function PopulateStanding(f)
+    local score, tier, standing, r, g, b = G.CollectionVerdict()
+    if not tier then
+        return false
+    end
+    f.icon:SetTexture(STANDING_ICON)
+    -- The verdict headline. Junk is never said to a player's face — honest numbers,
+    -- not name-calling — so the bottom tier leads with the standing row alone
+    -- (matches /howrare me's phrasing rule).
+    f.name:SetText(tier == "junk" and "Your achievements"
+        or ("Your achievements are " .. G.TierLabel(tier)))
+    f.name:SetTextColor(r, g, b)
+    FitName(f)
+    f.points:Hide()
+    f.shield:Hide()
+    f.rarityPre:SetText(string.format("|cffffd100Rarer than |r|cff%s%s|r|cffffd100 of %s.|r",
+        G.RGBHex(r, g, b), G.FormatStandingPct(standing), G.ScopeNoun("accounts")))
+    f.rarityTilde:SetText("")
+    f.rarityPost:SetText("")
+    -- Footer: whose verdict, the score behind it, and the snapshot the standing is
+    -- measured against. The "~" takes the nudged tilde piece, like a count-form rank.
+    f.stampPre:SetText(string.format("%s  ·  score ", UnitName("player")))
+    f.stampTilde:SetText("~")
+    f.stampPost:SetText(string.format("%s  ·  Rarity as of %s",
+        BreakUpLargeNumbers(math.floor(score + 0.5)), G.AsOfShort()))
+    -- Tier tint follows the addon's one notability judgment: rare-and-rarer
+    -- verdicts flourish in their colour, the rest stay stock white.
+    if G.IsRareTierName(tier) then
+        f.fxR, f.fxG, f.fxB = r, g, b
+    else
+        f.fxR, f.fxG, f.fxB = 1, 1, 1
+    end
+    return true
+end
+
+-- /howrare me's card: pin the collection-standing showcase (non-fading, Replay/Close)
+-- and play its flourish. Quietly refuses (returns false) on a data file without a
+-- standing distribution — the command prints the explanation.
+function G.ShowStandingCard()
+    local f = ShowSample(PopulateStanding)
+    if not f then
+        return false
+    end
+    PinButtons(f)
+    f.PlayEffects()
+    return true
+end
+
 -- Debug: /howrare toast pin — show one toast that does NOT fade, with Replay/Close
 -- buttons beneath it, so the card can be studied or screenshotted at leisure. Uses
 -- your rarest earned achievement whose name fits (ShowcaseId), so the pinned card
 -- shows the real footer — earn date, and the rank brag when it applies. Holds
 -- slot 1 until you Close it.
+-- Fill-closure for a sample showing one achievement — the shape the showcase pin
+-- and the position mover both need; a nil id (empty snapshot) yields nil.
+local function ShowSampleAchievement(id)
+    return id and ShowSample(function(f)
+        return Populate(f, id)
+    end) or nil
+end
+
 local function DebugPin()
-    local f = ShowSample(ShowcaseId())
+    local f = ShowSampleAchievement(ShowcaseId())
     if not f then
         G.Print("toast pin: no client-known achievement.")
         return
     end
-
-    if not f.pinReplay then
-        f.pinReplay = ToastButton(f, "LEFT", 110, "Replay effect", function() f.PlayEffects() end)
-        f.pinClose = ToastButton(f, "RIGHT", 70, "Close", function()
-            f.pinReplay:Hide()
-            f.pinClose:Hide()
-            f:Hide()
-            Layout()
-        end)
-    end
-    f.pinReplay:Show()
-    f.pinClose:Show()
+    PinButtons(f)
     f.PlayEffects()
     G.Print("toast pinned — Replay effect / Close beneath it.")
 end
@@ -619,7 +713,7 @@ function G.ToastMoveMode()
     if SettingsPanel and SettingsPanel:IsShown() then
         HideUIPanel(SettingsPanel)
     end
-    local f = ShowSample(DebugIds()[1])
+    local f = ShowSampleAchievement(DebugIds()[1])
     if not f then
         G.Print("move toast: no client-known achievement to show.")
         return
@@ -635,10 +729,9 @@ function G.ToastMoveMode()
             f:SetScript("OnDragStop", nil)
             f:RegisterForDrag()
             f:SetMovable(false)
-            f.moveLock:Hide()
-            f.moveReset:Hide()
+            HideCardButtons(f)
             f:Hide()
-            Layout()
+            PumpQueue() -- earns that arrived during move mode show now
             G.Print("toast position saved.")
         end)
         f.moveReset = ToastButton(f, "RIGHT", 110, "Reset position", function()
