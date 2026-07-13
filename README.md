@@ -87,14 +87,19 @@ ln -s "$(pwd)/HowRare" \
 
 The rarity data lives in the
 [AchievementRarity](https://github.com/wizzleworks-gg/achievement-rarity) repo, which
-How Rare? embeds under `HowRare/Libs/AchievementRarity-1.0/`. To ship a fresher
-snapshot, regenerate the library's data there (from the gratz repo's
-`scripts/export-rarity-library.py`, which pulls PROD), then re-copy the library folder
-into `HowRare/Libs/` and commit:
+How Rare? embeds under `HowRare/Libs/AchievementRarity-1.0/`. One command ships a
+fresher snapshot end-to-end:
 
 ```sh
-cp -R ../achievement-rarity/AchievementRarity-1.0 HowRare/Libs/
+scripts/publish-data.sh
 ```
+
+It tunnels to prod, regenerates the library's data file (via the gratz repo's
+`scripts/export-rarity-library.py` — releases always ship PROD numbers), stamps and
+pushes the `achievement-rarity` repo, then re-copies the library folder into
+`HowRare/Libs/` and commits here. It refuses a partial export (counts without
+ranks/standing) and commits nothing when the snapshot is unchanged. Run it right
+before tagging so the release carries the freshest embed.
 
 ### Releasing
 
