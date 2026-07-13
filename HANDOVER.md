@@ -14,43 +14,50 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
 - **Repos:** gratz — all rarity/standing work committed AND pushed/deployed: the
   nightly 05:30 counter computes rarity + rank curves + the `rarity_score` standing
   distribution; migration 083 (`v_shipped_achievements` + `standing_meta`) is applied
-  on prod. how-rare `2c89164` + achievement-rarity `5bf6e1b` — committed, **NOT
-  pushed** (their pushes deploy nothing; push whenever, tagging implies it).
-- **Embed:** the addon carries the prod snapshot asOf **2026-07-12** (828,106 tracked
+  on prod (nightly run verified clean 2026-07-13: all sections wrote, standing sums
+  match the denominators exactly). achievement-rarity — fully pushed through the
+  2026-07-13 snapshot. how-rare — release commits on main, **NOT pushed** (its pushes
+  deploy nothing; tagging pushes them).
+- **Embed:** the addon carries the prod snapshot asOf **2026-07-13** (835,577 tracked
   accounts; all three standing scopes; the 4 retired achievements excluded). It drifts
-  ~a day stale per cron tick — re-publish right before tagging.
+  ~a day stale per cron tick — `scripts/publish-data.sh` right before tagging if a
+  day+ has passed.
 - **Verified:** full in-game sign-off; stub-Lua harness green against the real data
   file (standing interpolation, elite-tail cap + monotonicity, no-standing
   degradation); luac/XML clean. Library API at **API_MINOR 4**; collection standing
   lives fully in the LIBRARY (weight/score/standing/tier) — any consumer can build the
   verdict; How Rare? adds only the isEarned callback + the surfaces.
 
-## NEXT — the release train (one session, admin + packaging only)
+## NEXT — the release train (admin + packaging only)
 
-1. **One-command publish script** — automate today's manual flow (README "Updating
-   the embedded library"): `ssh -f -N -L 15432:localhost:5432 root@204.168.168.180` →
-   `gratz/.venv/bin/python scripts/export-rarity-library.py --database-url
-   postgresql://gratz:gratz@localhost:15432/gratz` (writes the library repo's data
-   file; its output must say `standing scopes: ['eu', 'global', 'us']`) → commit/push
-   achievement-rarity → `cp -R ../achievement-rarity/AchievementRarity-1.0
-   HowRare/Libs/ && chmod 644 HowRare/Libs/AchievementRarity-1.0/*.lua` → commit
-   how-rare. Decide depth: local one-command now vs box-side auto-push later — the
-   trade-offs are in "Deferred from the shipped library theme" below.
-2. **CurseForge admin:** create the How Rare? project; set `CF_API_KEY` (secret) +
-   `CF_PROJECT_ID` (variable) on the how-rare repo. The tag-driven
-   `.github/workflows/release.yml` is built but its upload path has NEVER run
-   end-to-end — the first tag proves it. TWO OPEN DECISIONS: (a) how-rare repo
-   visibility (currently private; README links to the public library repo as its
-   reference consumer); (b) a standalone CurseForge listing for the library at launch —
-   its whole point is the freshness channel, only honest once refresh is automated
-   (distribution model below); if yes it needs its own release workflow (mirror
-   how-rare's; zip = TOC + LibStub + the versioned lib folder).
-3. **Library release tidy:** CHANGELOG `## Unreleased` → a named release; TOC
-   `## Version:` (stale at 2026.06.28) → the snapshot date at release; settle the
-   version scheme (date-based fits the freshest-wins minor).
-4. **Tag:** re-run the publish (step 1) for a fresh embed, then on how-rare
-   `git tag v1.0.0 && git push --tags` — the tag must match the CHANGELOG `## 1.0.0`
-   heading; CI stamps the TOC version and uploads with that changelog section.
+1. ~~**One-command publish script**~~ **DONE (2026-07-13): `scripts/publish-data.sh`**
+   (how-rare repo) — tunnel → prod export → verify (three standing scopes, no
+   warnings, luac parse) → stamp the library TOC → commit+push achievement-rarity →
+   re-embed → commit how-rare. Proven end-to-end twice (fresh publish + idempotent
+   no-op re-run); refuses partial exports; owns port 15433 with
+   ExitOnForwardFailure so it can never silently ride a squatting listener (a
+   long-lived pgAdmin tunnel tends to hold 15432). Depth decided: **local
+   one-command now**; box-side auto-push stays deferred (below).
+2. **CurseForge admin (USER — needs the CurseForge account):** create the How Rare?
+   project; set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the how-rare
+   repo. The tag-driven `.github/workflows/release.yml` is built and its zip step is
+   locally proven (`scripts/release.sh` — correct contents incl. the fresh embed),
+   but the upload path has NEVER run end-to-end — the first tag proves it. TWO OPEN
+   DECISIONS: (a) how-rare repo visibility (currently private; README links to the
+   public library repo as its reference consumer); (b) a standalone CurseForge
+   listing for the library at launch — its whole point is the freshness channel,
+   only honest once refresh is automated (distribution model below); if yes it needs
+   its own release workflow (mirror how-rare's; zip = TOC + LibStub + the versioned
+   lib folder).
+3. ~~**Library release tidy**~~ **DONE (2026-07-13):** CHANGELOG `## Unreleased` →
+   `## 2026.07.13`; version scheme settled **date-based** (matches the
+   snapshot-derived LibStub minor); the publish script now stamps the library TOC
+   `## Version:` with the snapshot date on every publish, so it can't go stale again.
+4. **Tag (after step 2):** if a day+ has passed since the last publish, re-run
+   `scripts/publish-data.sh` for a fresh embed, then on how-rare
+   `git tag v1.0.0 && git push --tags` (this also pushes the unpushed release
+   commits) — the tag must match the CHANGELOG `## 1.0.0` heading (it does); CI
+   stamps the TOC version and uploads with that changelog section.
 
 ## Shipped log (compressed — full detail in the three repos' git logs)
 
@@ -323,12 +330,13 @@ Two independent tracks; the surfaces depend only on Track 1.
 ## Deferred from the shipped library theme (don't lose)
 
 - **Publish milestone — do these together, once v1 is settled:**
-  - Crawler → export → push automation (run `gratz/scripts/export-rarity-library.py`
-    after the rarity counter, push the `achievement-rarity` repo, **re-embed both halves
-    into `HowRare/Libs/`**). The rank-breakpoint export folds into this same step. How
-    Rare? embeds *copies* (not symlinks), so the embedded data file is whatever the last
-    publish baked — keep it on the rarity-refresh cadence so the embedded baseline never
-    drifts far. Releases ship PROD numbers (tunnel to prod, export, re-embed); the
+  - Crawler → export → push automation. The **local one-command half is DONE**
+    (`scripts/publish-data.sh`, 2026-07-13 — tunnel to prod, export, verify, push the
+    library repo, re-embed, commit); what stays deferred is the **box-side auto-push**
+    (run the export after the nightly counter on the box and push without a human),
+    which matters only once a standalone library listing exists to keep fresh. How
+    Rare? embeds *copies* (not symlinks), so the embedded data file is whatever the
+    last publish baked. Releases ship PROD numbers — the script tunnels to prod; the
     committed embed must never carry dev numbers.
   - Standalone CurseForge publish of the library + a release workflow (none yet).
   - gratz-site attribution reframe ("gratz.gg-supplied" → "the Wizzleworks"; casing).
