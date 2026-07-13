@@ -31,6 +31,9 @@ PORT=15433
 # unrelated edits into the data commit. Same for the embed path here.
 [ -z "$(git -C "$LIB" status --porcelain)" ] \
   || { echo "error: $LIB has uncommitted changes — commit or stash first" >&2; exit 1; }
+# The prod box publishes the library repo nightly (gratz scripts/cron-rarity-publish.sh),
+# so this checkout may be behind — sync first or the push below fails.
+git -C "$LIB" pull --ff-only
 [ -z "$(git status --porcelain -- HowRare/Libs)" ] \
   || { echo "error: HowRare/Libs has uncommitted changes — commit or stash first" >&2; exit 1; }
 
