@@ -50,11 +50,17 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    (US/EU/global), plus rank-at-earn and collection standing. Install alongside a
    consumer addon to keep its numbers fresh." (freshest-wins mechanism promised, no
    cadence — strengthen once automation runs); categories Libraries (main) +
-   Achievements (additional); license MIT; source link = the GitHub repo. REMAINING:
-   user creates the library project with those assets, then the How Rare? project;
-   set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the how-rare repo. The
-   library still needs its own release workflow + first upload zip (mirror
-   how-rare's; zip = TOC + LibStub + the versioned lib folder). how-rare's tag-driven
+   Achievements (additional); license MIT; source link = the GitHub repo. The first
+   upload zip is BUILT (`scripts/release.sh` in the library repo — stages the
+   root-is-addon layout into a proper `AchievementRarity/` folder; the zip sits
+   untracked at the repo root) and the project-page description markdown is ready
+   (`assets/curseforge-description.md`, same repo). REMAINING: user creates the
+   library project with those assets + uploads the zip, then the How Rare? project;
+   set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the how-rare repo; the
+   library still needs its tag-driven release workflow (mirror how-rare's — its zip
+   script now exists). Noticed 2026-07-13, unfixed: the library README's methodology
+   section still says the rank floor is 14 Oct 2008, but the shipped data's
+   `rankFloor` is 2004-11-23 (WoW launch). how-rare's tag-driven
    `.github/workflows/release.yml` is built and its zip step locally proven
    (`scripts/release.sh` — correct contents incl. the fresh embed), but the upload
    path has NEVER run end-to-end — the first tag proves it.
