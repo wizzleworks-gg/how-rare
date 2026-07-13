@@ -55,15 +55,23 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    description at `assets/curseforge-description.md`; CHANGELOG's `## 2026.07.13 —
    initial release` section rewritten as the public entry (the convention now: the
    tag-heading section IS what CI/an upload form gets, dev history stays in git log).
-   **The AchievementRarity project is SUBMITTED — awaiting CurseForge approval
-   (submitted 2026-07-13, review ~days).**
-   **GATED ON THAT APPROVAL:** the library's `CF_API_KEY`/`CF_PROJECT_ID`, its
-   tag-driven release workflow (mirror how-rare's — the zip script exists), and the
-   NIGHTLY PUBLISH AUTOMATION for BOTH projects (box-side export → push → CurseForge
-   upload; cadence to be discussed when built). Noticed 2026-07-13, unfixed
-   (deliberately parked until after release): the library README's methodology
-   section still says the rank floor is 14 Oct 2008, but the shipped data's
-   `rankFloor` is 2004-11-23 (WoW launch).
+   **The AchievementRarity project is APPROVED (2026-07-13, same day).** Its
+   tag-driven release workflow is BUILT + pushed (`.github/workflows/release.yml`,
+   mirror of how-rare's: root-layout TOC, date-based versions, and a data-refresh
+   changelog fallback — a tag without a CHANGELOG section uploads as "Data snapshot
+   as of <date>"). REMAINING for the library: user sets `CF_API_KEY` (secret;
+   user-set so the token never transits chat) + `CF_PROJECT_ID` (variable, the
+   numeric id on the project page) on the achievement-rarity repo; then the CI
+   upload path gets proven with the NEXT fresh snapshot (publish → tag `v<date>`) —
+   do NOT tag `v2026.07.13`, that file was already uploaded manually at submission.
+   NIGHTLY PUBLISH AUTOMATION: design proposed 2026-07-13 (box-side after the 05:30
+   counter: export → commit/tag/push the library repo via a deploy key; the Actions
+   workflow does the CurseForge upload — the box never holds the CF token), awaiting
+   approval + build; cadence per project still to settle (library nightly; How Rare?
+   embeds refresh slower — the standalone library is the freshness channel).
+   Noticed 2026-07-13, unfixed (deliberately parked until after release): the
+   library README's methodology section still says the rank floor is 14 Oct 2008,
+   but the shipped data's `rankFloor` is 2004-11-23 (WoW launch).
    **NEXT: the How Rare? CurseForge project, same process** — assets DRAFTED
    2026-07-13: name = the TOC/CLAUDE.md title "How Rare? — Achievement Rarity";
    summary (248 chars): "How rare is that achievement? See the share of accounts
@@ -76,23 +84,25 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    existing `## 1.0.0` section (already public-facing). Logo PICKED 2026-07-13:
    the family lockup (gold question + the library's loot-quality percent in the
    corner — the addon asks, the library answers), committed at `assets/` (512px
-   PNG master + SVG source). User then creates the project and sets `CF_API_KEY`
-   (secret) +
-   `CF_PROJECT_ID` (variable) on the how-rare repo. how-rare's tag-driven
-   `.github/workflows/release.yml` is built and its zip step locally proven
-   (`scripts/release.sh` — correct contents incl. the fresh embed), but the upload
-   path has NEVER run end-to-end — the first tag proves it (or, if the first file is
-   uploaded manually at project creation like the library's, the CI path gets proven
-   on the first post-approval release instead).
+   PNG master + SVG source). **The How Rare? project is SUBMITTED — awaiting
+   approval (2026-07-13; the v1.0.0 zip uploaded manually at creation).**
+   Recommended while approval is pending: tag `v1.0.0` on how-rare BEFORE setting
+   its secrets — the workflow runs and proves the CI zip step while harmlessly
+   skipping the upload, and main gets its release marker; the CI upload path then
+   gets proven at the first post-approval release (the next embed refresh). On
+   approval: set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the
+   how-rare repo.
 3. ~~**Library release tidy**~~ **DONE (2026-07-13):** CHANGELOG `## Unreleased` →
    `## 2026.07.13`; version scheme settled **date-based** (matches the
    snapshot-derived LibStub minor); the publish script now stamps the library TOC
    `## Version:` with the snapshot date on every publish, so it can't go stale again.
-4. **Tag (after step 2):** if a day+ has passed since the last publish, re-run
-   `scripts/publish-data.sh` for a fresh embed, then on how-rare
-   `git tag v1.0.0 && git push --tags` (this also pushes the unpushed release
-   commits) — the tag must match the CHANGELOG `## 1.0.0` heading (it does); CI
-   stamps the TOC version and uploads with that changelog section.
+4. **Tag — SUPERSEDED by the manual first uploads (step 2).** Both v1 files are
+   already on CurseForge (uploaded manually at project creation), so the original
+   "first tag uploads v1" plan no longer applies. What tags now do: how-rare
+   `git tag v1.0.0 && git push --tags` marks the release commit and proves the CI
+   zip step (upload skips while secrets are unset — recommended now); the library
+   tags `v<snapshot-date>` per data refresh once its secrets are set. All future
+   releases go through the tag→CI path.
 
 ## Shipped log (compressed — full detail in the three repos' git logs)
 
