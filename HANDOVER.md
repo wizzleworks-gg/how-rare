@@ -73,10 +73,11 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    Chat & Communication (additional); license All Rights Reserved; description at
    `assets/curseforge-description.md` (this repo); first-upload zip built
    (`HowRare-1.0.0.zip`, untracked at repo root); changelog = the CHANGELOG's
-   existing `## 1.0.0` section (already public-facing). Three logo candidates
-   rendered (gold question / epic-dot / question + the library's percent lockup) —
-   awaiting the user's pick, then the chosen SVG+PNG gets committed to `assets/`.
-   User then creates the project and sets `CF_API_KEY` (secret) +
+   existing `## 1.0.0` section (already public-facing). Logo PICKED 2026-07-13:
+   the family lockup (gold question + the library's loot-quality percent in the
+   corner — the addon asks, the library answers), committed at `assets/` (512px
+   PNG master + SVG source). User then creates the project and sets `CF_API_KEY`
+   (secret) +
    `CF_PROJECT_ID` (variable) on the how-rare repo. how-rare's tag-driven
    `.github/workflows/release.yml` is built and its zip step locally proven
    (`scripts/release.sh` — correct contents incl. the fresh embed), but the upload
