@@ -38,17 +38,26 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    ExitOnForwardFailure so it can never silently ride a squatting listener (a
    long-lived pgAdmin tunnel tends to hold 15432). Depth decided: **local
    one-command now**; box-side auto-push stays deferred (below).
-2. **CurseForge admin (USER — needs the CurseForge account):** create the How Rare?
-   project; set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the how-rare
-   repo. The tag-driven `.github/workflows/release.yml` is built and its zip step is
-   locally proven (`scripts/release.sh` — correct contents incl. the fresh embed),
-   but the upload path has NEVER run end-to-end — the first tag proves it. TWO OPEN
-   DECISIONS: (a) how-rare repo visibility (currently private; README links to the
-   public library repo as its reference consumer); (b) a standalone CurseForge
-   listing for the library at launch — its whole point is the freshness channel,
-   only honest once refresh is automated (distribution model below); if yes it needs
-   its own release workflow (mirror how-rare's; zip = TOC + LibStub + the versioned
-   lib folder).
+2. **CurseForge admin (USER — needs the CurseForge account).** Both former open
+   decisions SETTLED 2026-07-13: (a) the how-rare repo is now PUBLIC; (b) a
+   standalone library listing — YES, submitted FIRST (review takes days and is the
+   long pole; refresh automation for BOTH projects follows right after approval —
+   cadence to be discussed then). Listing assets for **AchievementRarity** are ready
+   (2026-07-13): name `AchievementRarity`; logo = loot-quality percent (epic/legendary
+   rings, gold slash) committed at the library repo's `assets/` (512px PNG master +
+   SVG source); summary (245 chars): "Achievement rarity data by the Wizzleworks — an
+   embeddable LibStub library: the share of accounts that hold each achievement
+   (US/EU/global), plus rank-at-earn and collection standing. Install alongside a
+   consumer addon to keep its numbers fresh." (freshest-wins mechanism promised, no
+   cadence — strengthen once automation runs); categories Libraries (main) +
+   Achievements (additional); license MIT; source link = the GitHub repo. REMAINING:
+   user creates the library project with those assets, then the How Rare? project;
+   set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the how-rare repo. The
+   library still needs its own release workflow + first upload zip (mirror
+   how-rare's; zip = TOC + LibStub + the versioned lib folder). how-rare's tag-driven
+   `.github/workflows/release.yml` is built and its zip step locally proven
+   (`scripts/release.sh` — correct contents incl. the fresh embed), but the upload
+   path has NEVER run end-to-end — the first tag proves it.
 3. ~~**Library release tidy**~~ **DONE (2026-07-13):** CHANGELOG `## Unreleased` →
    `## 2026.07.13`; version scheme settled **date-based** (matches the
    snapshot-derived LibStub minor); the publish script now stamps the library TOC
