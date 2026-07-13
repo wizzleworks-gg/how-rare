@@ -21,7 +21,9 @@ SIBLINGS="$(dirname "$PWD")"
 GRATZ="$SIBLINGS/gratz"
 LIB="$SIBLINGS/achievement-rarity"
 PROD="root@204.168.168.180"
-PORT=15432
+# Deliberately NOT 15432 (the manual-flow port a long-lived pgAdmin tunnel tends to
+# hold) — the script owns its own port so the two never collide.
+PORT=15433
 
 [ -x "$GRATZ/.venv/bin/python" ] || { echo "error: $GRATZ/.venv/bin/python not found" >&2; exit 1; }
 [ -d "$LIB/.git" ] || { echo "error: $LIB is not a git checkout" >&2; exit 1; }
@@ -33,9 +35,11 @@ PORT=15432
   || { echo "error: HowRare/Libs has uncommitted changes — commit or stash first" >&2; exit 1; }
 
 # Tunnel via a control socket so teardown is deterministic (a bare `ssh -f -N`
-# would outlive the script). Fails fast if the port is already bound.
+# would outlive the script). ExitOnForwardFailure is essential: without it a failed
+# bind (port already taken) backgrounds ssh anyway and the export would silently
+# ride whatever listener holds the port.
 SOCK="$(mktemp -d)/tunnel.sock"
-ssh -f -N -M -S "$SOCK" -L "${PORT}:localhost:5432" "$PROD"
+ssh -f -N -M -S "$SOCK" -o ExitOnForwardFailure=yes -L "${PORT}:localhost:5432" "$PROD"
 trap 'ssh -S "$SOCK" -O exit "$PROD" 2>/dev/null || true' EXIT
 
 out="$("$GRATZ/.venv/bin/python" "$GRATZ/scripts/export-rarity-library.py" \
