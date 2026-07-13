@@ -50,20 +50,39 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    (US/EU/global), plus rank-at-earn and collection standing. Install alongside a
    consumer addon to keep its numbers fresh." (freshest-wins mechanism promised, no
    cadence — strengthen once automation runs); categories Libraries (main) +
-   Achievements (additional); license MIT; source link = the GitHub repo. The first
-   upload zip is BUILT (`scripts/release.sh` in the library repo — stages the
-   root-is-addon layout into a proper `AchievementRarity/` folder; the zip sits
-   untracked at the repo root) and the project-page description markdown is ready
-   (`assets/curseforge-description.md`, same repo). REMAINING: user creates the
-   library project with those assets + uploads the zip, then the How Rare? project;
-   set `CF_API_KEY` (secret) + `CF_PROJECT_ID` (variable) on the how-rare repo; the
-   library still needs its tag-driven release workflow (mirror how-rare's — its zip
-   script now exists). Noticed 2026-07-13, unfixed: the library README's methodology
+   Achievements (additional); license MIT; source link = the GitHub repo. Zip build
+   via `scripts/release.sh` (library repo — stages the root-is-addon layout);
+   description at `assets/curseforge-description.md`; CHANGELOG's `## 2026.07.13 —
+   initial release` section rewritten as the public entry (the convention now: the
+   tag-heading section IS what CI/an upload form gets, dev history stays in git log).
+   **The AchievementRarity project is SUBMITTED — awaiting CurseForge approval
+   (submitted 2026-07-13, review ~days).**
+   **GATED ON THAT APPROVAL:** the library's `CF_API_KEY`/`CF_PROJECT_ID`, its
+   tag-driven release workflow (mirror how-rare's — the zip script exists), and the
+   NIGHTLY PUBLISH AUTOMATION for BOTH projects (box-side export → push → CurseForge
+   upload; cadence to be discussed when built). Noticed 2026-07-13, unfixed
+   (deliberately parked until after release): the library README's methodology
    section still says the rank floor is 14 Oct 2008, but the shipped data's
-   `rankFloor` is 2004-11-23 (WoW launch). how-rare's tag-driven
+   `rankFloor` is 2004-11-23 (WoW launch).
+   **NEXT: the How Rare? CurseForge project, same process** — assets DRAFTED
+   2026-07-13: name = the TOC/CLAUDE.md title "How Rare? — Achievement Rarity";
+   summary (248 chars): "How rare is that achievement? See the share of accounts
+   that have each one — on every tooltip, chat announcement, and achievement-panel
+   row, plus an earned toast, rank-at-earn (\"you were in the first 0.4%\"), and a
+   verdict for your whole collection."; categories Achievements (main) + Tooltip,
+   Chat & Communication (additional); license All Rights Reserved; description at
+   `assets/curseforge-description.md` (this repo); first-upload zip built
+   (`HowRare-1.0.0.zip`, untracked at repo root); changelog = the CHANGELOG's
+   existing `## 1.0.0` section (already public-facing). Three logo candidates
+   rendered (gold question / epic-dot / question + the library's percent lockup) —
+   awaiting the user's pick, then the chosen SVG+PNG gets committed to `assets/`.
+   User then creates the project and sets `CF_API_KEY` (secret) +
+   `CF_PROJECT_ID` (variable) on the how-rare repo. how-rare's tag-driven
    `.github/workflows/release.yml` is built and its zip step locally proven
    (`scripts/release.sh` — correct contents incl. the fresh embed), but the upload
-   path has NEVER run end-to-end — the first tag proves it.
+   path has NEVER run end-to-end — the first tag proves it (or, if the first file is
+   uploaded manually at project creation like the library's, the CI path gets proven
+   on the first post-approval release instead).
 3. ~~**Library release tidy**~~ **DONE (2026-07-13):** CHANGELOG `## Unreleased` →
    `## 2026.07.13`; version scheme settled **date-based** (matches the
    snapshot-derived LibStub minor); the publish script now stamps the library TOC
@@ -353,7 +372,9 @@ Two independent tracks; the surfaces depend only on Track 1.
     Rare? embeds *copies* (not symlinks), so the embedded data file is whatever the
     last publish baked. Releases ship PROD numbers — the script tunnels to prod; the
     committed embed must never carry dev numbers.
-  - Standalone CurseForge publish of the library + a release workflow (none yet).
+  - Standalone CurseForge publish of the library: SUBMITTED 2026-07-13, awaiting
+    approval; its tag-driven release workflow is still to build (gated on approval,
+    together with the nightly automation).
   - gratz-site attribution reframe ("gratz.gg-supplied" → "the Wizzleworks"; casing).
 - **Distribution model — DECIDED (revisited 2026-06-29): embed-first, optional
   standalone, NOT a hard dependency.** Every consumer embeds the library (always works
