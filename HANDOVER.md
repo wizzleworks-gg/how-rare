@@ -107,7 +107,14 @@ architecture references (`../gratz-addon/docs/addon-architecture.md` §6/§7/§1
    `## 2026.07.13`; version scheme settled **date-based** (matches the
    snapshot-derived LibStub minor); the publish script now stamps the library TOC
    `## Version:` with the snapshot date on every publish, so it can't go stale again.
-4. **Tag — SUPERSEDED by the manual first uploads (step 2).** Both v1 files are
+4. **TOC gap (noticed 2026-07-14, from the gratz-addon side):** `HowRare.toc` lacks
+   `## OptionalDeps: AchievementRarity`. The decided distribution model (see
+   "Distribution model" below) says consumers declare it — it's the load-order
+   guarantee that the standalone library (now live on CurseForge) loads before the
+   consumer so its fresher data wins; today How Rare? gets that order only by
+   alphabetical accident. One TOC line; ship it with the next release (e.g. the
+   v1.0.1 embed refresh). Gratz's TOC got the same line 2026-07-14.
+5. **Tag — SUPERSEDED by the manual first uploads (step 2).** Both v1 files are
    already on CurseForge (uploaded manually at project creation), so the original
    "first tag uploads v1" plan no longer applies. What tags now do: how-rare
    `git tag v1.0.0 && git push --tags` marks the release commit and proves the CI
