@@ -629,7 +629,11 @@ end
 -- wording as the title in the tier's colour, the standing as the rarity row, and a
 -- player · score · snapshot footer. No points shield (nothing to point at); the
 -- addon's own trophy icon. false when this data file ships no standing distribution.
-local STANDING_ICON = "Interface\\Icons\\Achievement_quests_completed_08"
+-- The addon's own brand icon (the TOC's IconTexture): the brilliant diamond
+-- — the universal "precious/rare" read, and deliberately nothing like the
+-- Gratz! addon's dark void spire so the two never blur on a minimap.
+-- (Eyeballed against the live icon render, 2026-07-16.)
+local STANDING_ICON = "Interface\\Icons\\INV_Misc_Gem_Diamond_07"
 local function PopulateStanding(f)
     local score, tier, standing, r, g, b = G.CollectionVerdict()
     if not tier then

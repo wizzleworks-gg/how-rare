@@ -4,7 +4,7 @@
 ## Author: the Wizzleworks
 ## Version: 1.0.0
 ## SavedVariables: HowRareDB
-## IconTexture: Interface\Icons\Achievement_quests_completed_08
+## IconTexture: Interface\Icons\INV_Misc_Gem_Diamond_07
 ## AddonCompartmentFunc: HowRare_OnAddonCompartmentClick
 ## Category-enUS: Collections
 
