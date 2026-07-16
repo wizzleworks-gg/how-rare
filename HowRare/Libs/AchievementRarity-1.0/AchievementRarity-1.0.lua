@@ -132,9 +132,10 @@ end
 -- for achievements earned long before this addon was installed, with no client-side
 -- stamp.
 
--- lib.rankFloor parsed to epoch seconds, memoised per-lib. The achievement system's launch
--- date (patch 3.0.2); the game back-credits old account-wide earns to it, so an earn date
--- at or below it is unreliable and the rank is suppressed. `false` once we've found the
+-- lib.rankFloor parsed to epoch seconds, memoised per-lib. WoW's retail launch date: an
+-- earn date at or below it predates the game, can't be real, and the rank is suppressed.
+-- (Dates the game back-credits to the achievement system's 2008 launch day are NOT
+-- suppressed — they rank within that day's pile-up.) `false` once we've found the
 -- field absent/unparseable, so we don't re-parse every call.
 local function floorTime(self)
     local t = self._rankFloorTime
@@ -158,8 +159,8 @@ end
 --   "off-snapshot" — the achievement isn't in this data file;
 --   "no-curve"     — no breakpoints for this scope (too few earners for a stable
 --                    percentile, or a data file without rank support);
---   "date-floor"   — the earn date is at/below the unreliable rankFloor (the game
---                    back-credits old account-wide earns there).
+--   "date-floor"   — the earn date is at/below rankFloor (WoW's launch): it predates
+--                    the game, so it can't be real.
 -- earnTime is the earn date as epoch seconds (os.time-style). Output is continuous —
 -- interpolated between the ladder breakpoints — so "first 0.3%" is meaningful, not just
 -- the ladder values. The caller decides display.
@@ -181,7 +182,7 @@ function lib:RankAtEarn(achievementID, earnTime, scope)
         return nil, "no-curve"
     end
     -- Day-offset of the earn date from the floor (rounded; the curve is week-granular, so a
-    -- sub-day DST wobble is immaterial). At/below the floor → unreliable date → suppress.
+    -- sub-day DST wobble is immaterial). At/below the floor → impossible date → suppress.
     local days = math.floor((earnTime - floor) / 86400 + 0.5)
     if days <= 0 then
         return nil, "date-floor"

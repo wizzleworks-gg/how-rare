@@ -405,8 +405,8 @@ local function ExplainWhy(rest)
     local rankAll, earnerPct = G.RankAtEarn(id)
     if not rankAll then
         if earnerPct == "date-floor" then
-            print(string.format("  your recorded earn date is at or before the achievement system's launch (%s) — the game back-credits old account-wide earns there, so the date is unreliable. rank suppressed.",
-                meta.rankFloor or "2008-10-14"))
+            print(string.format("  your recorded earn date is at or before WoW's launch (%s) — the game didn't exist to record it, so it can't be real. rank suppressed.",
+                meta.rankFloor or "2004-11-23"))
         else
             print("  no rank curve for it in this scope — too few tracked earners for a stable percentile. rank suppressed.")
         end
