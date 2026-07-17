@@ -36,14 +36,19 @@ building on them. State facts; no self-grading narrative.
    uploaded manually at creation; `v1.0.0` tagged; CI zip step proven with
    upload skipped) [carried]. **Approval status unknown from the repo — needs
    a CurseForge account check (user).**
-2. **On approval**: set `CF_API_KEY` secret + `CF_PROJECT_ID` variable on
-   this repo; prove the CI upload path with the first post-approval release
-   (the next embed refresh, e.g. v1.0.1) [carried].
-3. **OptionalDeps TOC line — still missing** [checked 2026-07-17 — grep
-   HowRare.toc]: add `## OptionalDeps: AchievementRarity` so the standalone
-   library loads before this consumer (freshest data wins by load order, not
-   alphabetical accident). One line; ship with the next release. Gratz's TOC
-   got its line 2026-07-14 [carried].
+2. **CF pair set — upload path still unproven.** `CF_API_KEY` set by user,
+   `CF_PROJECT_ID` = 1608900 (user-supplied, not independently verified —
+   a wrong id fails the first upload, red run, no damage) [checked
+   2026-07-17 — gh secret/variable list]. The unarmed gate leg is proven
+   live: manual dispatch ran, gate evaluated no-op, every later step
+   skipped, no tag created [checked 2026-07-17 — run 29593151777]. What
+   remains is the armed chain end-to-end (refresh → tag → dispatch →
+   zip → CurseForge upload) — first proof is Wednesday 2026-07-22 09:00
+   UTC, or an earlier manual dispatch; either ships v1.0.1 publicly.
+3. **OptionalDeps TOC line — done** [checked 2026-07-17 — commit bb9ea69]:
+   `## OptionalDeps: AchievementRarity` in HowRare.toc, load-order comment
+   updated; rides in the next release (v1.0.1). Gratz's TOC got its line
+   2026-07-14 [carried].
 4. **Embed automation — settled and built, not yet proven live** [checked
    2026-07-17 — written this session]: GitHub-side, not box-side —
    `.github/workflows/data-refresh.yml` re-embeds the library repo's snapshot
