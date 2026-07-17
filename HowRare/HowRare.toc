@@ -4,13 +4,17 @@
 ## Author: the Wizzleworks
 ## Version: 1.0.0
 ## SavedVariables: HowRareDB
+## OptionalDeps: AchievementRarity
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Diamond_07
 ## AddonCompartmentFunc: HowRare_OnAddonCompartmentClick
 ## Category-enUS: Collections
 
 # Embedded AchievementRarity library (data by the Wizzleworks) — loads before
 # Core, which delegates every rarity lookup to it. LibStub first, then the
-# generated snapshot, then the library's read API.
+# generated snapshot, then the library's read API. OptionalDeps above
+# guarantees the standalone AchievementRarity addon (if installed) loads
+# first, so its fresher data supersedes this embedded copy via LibStub
+# minor versioning.
 Libs\LibStub\LibStub.lua
 Libs\AchievementRarity-1.0\AchievementRarity-Data-1.0.lua
 Libs\AchievementRarity-1.0\AchievementRarity-1.0.lua
