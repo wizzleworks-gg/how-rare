@@ -49,6 +49,8 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
     addon root by the client; **must not** be listed in the TOC.
 - `scripts/release.sh` — builds the CurseForge upload zip from the TOC version
   (zips all of `HowRare/`, so the embedded library ships in it).
+- `docs/instance-rarity.md` — parked spec: rarity on Encounter Journal, world-map
+  and Group Finder surfaces (probe-proven 2026-06, not built; own session).
 
 ## Conventions
 

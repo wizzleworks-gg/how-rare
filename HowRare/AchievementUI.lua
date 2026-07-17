@@ -1,7 +1,9 @@
 -- AchievementUI.lua — rarity in Blizzard's achievement panel: the % painted on
 -- every list row (browse-by-rarity while scrolling), toggleable row-title tinting
--- by rarity tier, and a hover tooltip on every row. Augments only the Blizzard
--- frame — KAF's own browser is a separate surface.
+-- by rarity tier, and a hover tooltip on every row. The row % is deliberately
+-- current rarity, never rank-at-earn: a scan column must compare like with like,
+-- so rank lives on the focused surfaces only (tooltip, toast, chat). Augments
+-- only the Blizzard frame — KAF's own browser is a separate surface.
 local _, G = ...
 
 -- Tier-colouring of the row's title (button.Label), toggleable via
