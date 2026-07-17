@@ -32,19 +32,17 @@ building on them. State facts; no self-grading narrative.
 
 ## Release train — what actually remains
 
-1. **How Rare? CurseForge approval** — submitted 2026-07-13 (v1.0.0 zip
-   uploaded manually at creation; `v1.0.0` tagged; CI zip step proven with
-   upload skipped) [carried]. **Approval status unknown from the repo — needs
-   a CurseForge account check (user).**
-2. **CF pair set — upload path still unproven.** `CF_API_KEY` set by user,
-   `CF_PROJECT_ID` = 1608900 (user-supplied, not independently verified —
-   a wrong id fails the first upload, red run, no damage) [checked
-   2026-07-17 — gh secret/variable list]. The unarmed gate leg is proven
-   live: manual dispatch ran, gate evaluated no-op, every later step
-   skipped, no tag created [checked 2026-07-17 — run 29593151777]. What
-   remains is the armed chain end-to-end (refresh → tag → dispatch →
-   zip → CurseForge upload) — first proof is Wednesday 2026-07-22 09:00
-   UTC, or an earlier manual dispatch; either ships v1.0.1 publicly.
+1. **How Rare? CurseForge approval — approved and live** [checked
+   2026-07-17 — public page fetch]: curseforge.com/wow/addons/how-rare is
+   public, project id 1608900, live since 2026-07-13.
+2. **CF pair set; upload chain proven end-to-end** [checked 2026-07-17]:
+   armed manual dispatch ran the full train — embed refreshed to snapshot
+   2026-07-17, v1.0.1 committed + tagged by CI (75ed867), release.yml
+   dispatched on the tag, zip built, CurseForge accepted the upload (file
+   id 8452385, project 1608900; runs 29593296990 → 29593311505). The
+   unarmed gate leg was proven separately first (run 29593151777: no-op,
+   no tag). Residual: at check time the public page still listed 1.0.0 —
+   1.0.1 was in CurseForge's file-processing queue [not re-checked].
 3. **OptionalDeps TOC line — done** [checked 2026-07-17 — commit bb9ea69]:
    `## OptionalDeps: AchievementRarity` in HowRare.toc, load-order comment
    updated; rides in the next release (v1.0.1). Gratz's TOC got its line
@@ -59,9 +57,9 @@ building on them. State facts; no self-grading narrative.
    stamps TOC + CHANGELOG, tags, and dispatches release.yml on the tag ref
    (GITHUB_TOKEN pushes don't fire on:push workflows). Weekly cadence per
    [user call 2026-07-13]; the box never gets a how-rare deploy key. Gated
-   on the CF pair from item 2 — a no-op until those are set, so completing
-   item 2 arms this too. First live proof = first post-approval Wednesday
-   run [not checked — needs approval + the run].
+   on the CF pair from item 2. Proven live end-to-end via armed manual
+   dispatch [checked 2026-07-17 — see item 2]; next unattended proof is
+   the Wednesday 2026-07-22 09:00 UTC cron tick.
 
 Known edge [carried — documented in cron-rarity-publish.sh header]: a manual
 local publish the same morning suppresses that night's tag; never retro-tag
