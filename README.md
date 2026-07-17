@@ -118,6 +118,21 @@ TOC, which the tag also overwrites). `scripts/release.sh` builds the same zip lo
 for testing. CurseForge upload is inert until the `CF_API_KEY` secret and
 `CF_PROJECT_ID` variable are configured on the repo.
 
+### Weekly data releases (automated)
+
+Data-only releases need no hand at all: CI (`.github/workflows/data-refresh.yml`)
+runs every Wednesday at 09:00 UTC — just after both regions' weekly resets, so the
+release opens the new WoW week — re-copies the current snapshot from the
+[AchievementRarity](https://github.com/wizzleworks-gg/achievement-rarity) repo
+(which the gratz prod box refreshes nightly), and — only when the data changed —
+bumps the patch version, stamps the TOC and `CHANGELOG.md`, tags, and dispatches
+the release workflow to upload to CurseForge. Unchanged data means no release that
+week, and the whole train is a no-op until the CurseForge secret/variable above are
+set. Feature releases stay hand-tagged (minor/major bumps are yours); a hand-cut
+release embedding the same snapshot simply suppresses that week's automated one.
+Note the flip side: whatever is on `main` ships with Wednesday's release — land
+feature work with its own release, or keep it on a branch.
+
 ## License
 
 © 2026 the Wizzleworks. All rights reserved — see [LICENSE](LICENSE). The embedded

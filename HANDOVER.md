@@ -44,14 +44,27 @@ building on them. State facts; no self-grading narrative.
    library loads before this consumer (freshest data wins by load order, not
    alphabetical accident). One line; ship with the next release. Gratz's TOC
    got its line 2026-07-14 [carried].
-4. **On approval, settle**: this addon's box-side embed automation (a sibling
-   of gratz `cron-rarity-publish.sh`) and its cadence — slower than the
-   library's nightly; feature releases / periodic embed refreshes
-   [user call 2026-07-13].
+4. **Embed automation — settled and built, not yet proven live** [checked
+   2026-07-17 — written this session]: GitHub-side, not box-side —
+   `.github/workflows/data-refresh.yml` re-embeds the library repo's snapshot
+   every Wednesday 09:00 UTC (after both regions' weekly resets — release at
+   the WoW week boundary [user call 2026-07-17]; and two hours after the
+   box's 07:00 UTC nightly library publish) and, when changed, patch-bumps
+   over the latest v* tag,
+   stamps TOC + CHANGELOG, tags, and dispatches release.yml on the tag ref
+   (GITHUB_TOKEN pushes don't fire on:push workflows). Weekly cadence per
+   [user call 2026-07-13]; the box never gets a how-rare deploy key. Gated
+   on the CF pair from item 2 — a no-op until those are set, so completing
+   item 2 arms this too. First live proof = first post-approval Wednesday
+   run [not checked — needs approval + the run].
 
 Known edge [carried — documented in cron-rarity-publish.sh header]: a manual
 local publish the same morning suppresses that night's tag; never retro-tag
-unchanged data.
+unchanged data. Same shape weekly here: a hand-cut release embedding the
+current snapshot suppresses that Wednesday's auto-release (no diff). New edge
+[accepted 2026-07-17 — data-refresh.yml header]: main is auto-released as-is
+on Wednesdays, so unreleased feature work parked on main ships early under a
+patch bump — land it with its own release or hold it on a branch.
 
 ## Durable decisions (evidence noted; challenge if it fails)
 

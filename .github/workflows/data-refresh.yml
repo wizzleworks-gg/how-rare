@@ -1,0 +1,129 @@
+name: Data refresh
+
+# Weekly automated release of the embedded AchievementRarity data: every
+# Wednesday, 09:00 UTC — after BOTH regions' weekly resets (US Tuesday, EU
+# Wednesday early morning), so the release lands at the start of the WoW week,
+# when players log back in and addon managers pull updates, carrying a snapshot
+# that contains the whole completed raid week; also two hours after that
+# morning's nightly 07:00 UTC library publish from the box. This re-copies the
+# public achievement-rarity repo's current snapshot into
+# HowRare/Libs/ and — only when the data actually changed — bumps the patch
+# version, stamps TOC + CHANGELOG, commits, tags, and dispatches the release
+# workflow to build the zip and upload to CurseForge.
+#
+# Deliberate properties, mirroring gratz's cron-rarity-publish.sh discipline:
+#   - unchanged data → no commit, no tag, quiet exit (a stalled library repo
+#     degrades to "no release this week", never a duplicate one);
+#   - CurseForge not configured (CF_API_KEY secret / CF_PROJECT_ID variable
+#     missing) → the whole run is a no-op, so no phantom tags whose zips never
+#     reached users; setting the two on the repo arms the train;
+#   - version bumps are automated PATCH bumps over the latest v* tag; minor and
+#     major stay human (feature releases are hand-tagged per README, and a hand
+#     release embedding the same snapshot simply suppresses that week's
+#     auto-release — the run sees no diff);
+#   - the commit + tag are pushed with GITHUB_TOKEN, whose pushes deliberately
+#     do not fire on:push workflows — so release.yml is dispatched explicitly
+#     on the new tag ref instead (workflow_dispatch is the documented exception
+#     GITHUB_TOKEN may trigger).
+#
+# Known edge (accepted): main is auto-released as-is — merged-but-unreleased
+# feature work on main ships early, under a patch bump, on the next Wednesday.
+# Land feature work with its own hand-cut release, or hold it on a branch.
+
+on:
+  schedule:
+    - cron: '0 9 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      # Secrets aren't readable in `if:` conditions — gate in bash (same
+      # pattern as release.yml's upload step) and condition later steps on it.
+      - name: Gate on CurseForge configuration
+        id: gate
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CF_API_KEY:-}" ] || [ -z "${CF_PROJECT_ID:-}" ]; then
+            echo "CF_API_KEY secret or CF_PROJECT_ID variable not set — skipping the weekly refresh."
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+        with:
+          fetch-depth: 0 # full history: the next version is computed from tags
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.go == 'true'
+        with:
+          repository: wizzleworks-gg/achievement-rarity
+          path: lib
+
+      # Same replace-the-versioned-folder semantics as scripts/publish-data.sh:
+      # data file + read API; LibStub is static and stays put.
+      - name: Refresh embedded library
+        id: embed
+        if: steps.gate.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+          ver_raw="$(grep -m1 '^## Version:' lib/AchievementRarity.toc | awk '{print $3}')"
+          asof="${ver_raw//./-}"
+          [[ "$asof" =~ ^20[0-9]{2}-[0-9]{2}-[0-9]{2}$ ]] \
+            || { echo "error: library TOC version '${ver_raw}' is not a snapshot date" >&2; exit 1; }
+          rsync -a --delete lib/AchievementRarity-1.0/ HowRare/Libs/AchievementRarity-1.0/
+          chmod 644 HowRare/Libs/AchievementRarity-1.0/*.lua
+          rm -rf lib
+          if [ -z "$(git status --porcelain -- HowRare/Libs)" ]; then
+            echo "embed already at snapshot ${asof} — nothing to release this week"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "asof=${asof}" >> "$GITHUB_OUTPUT"
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The CHANGELOG section doubles as the CurseForge changelog — release.yml
+      # uploads the version's section verbatim, keeping the documented invariant
+      # (tag = TOC version = CHANGELOG heading) true for automated releases too.
+      - name: Bump version, stamp, commit, tag
+        id: cut
+        if: steps.embed.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          asof="${{ steps.embed.outputs.asof }}"
+          last="$(git tag --list 'v*' --sort=-v:refname | head -1)"
+          [ -n "$last" ] || { echo "error: no v* tag to bump from" >&2; exit 1; }
+          IFS=. read -r maj min pat <<<"${last#v}"
+          V="${maj}.${min}.$((pat + 1))"
+          git rev-parse -q --verify "refs/tags/v${V}" >/dev/null \
+            && { echo "error: computed tag v${V} already exists — needs a human look" >&2; exit 1; }
+          perl -pi -e "s/^## Version:.*/## Version: ${V}/" HowRare/HowRare.toc
+          perl -0pi -e "s/\A# Changelog\n/# Changelog\n\n## ${V}\n\nRarity data refresh — snapshot as of ${asof}.\n/" CHANGELOG.md
+          grep -q "^## ${V}\$" CHANGELOG.md \
+            || { echo "error: CHANGELOG.md section for ${V} was not written" >&2; exit 1; }
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add HowRare/Libs HowRare/HowRare.toc CHANGELOG.md
+          git commit -m "data: embed snapshot ${asof} (v${V})"
+          git tag "v${V}"
+          git push origin main "v${V}"
+          echo "version=${V}" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch release workflow
+        if: steps.embed.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "v${{ steps.cut.outputs.version }}"
+          echo "release dispatched on v${{ steps.cut.outputs.version }} — zip build + CurseForge upload continue there"
