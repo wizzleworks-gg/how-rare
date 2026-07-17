@@ -2,7 +2,7 @@
 ## Title: How Rare? — Achievement Rarity
 ## Notes: Achievement rarity from the Wizzleworks — the share of accounts that have each achievement, on every tooltip, chat line and achievement-panel row, plus an earned toast. Data by the Wizzleworks.
 ## Author: the Wizzleworks
-## Version: 1.0.0
+## Version: 1.0.1
 ## SavedVariables: HowRareDB
 ## OptionalDeps: AchievementRarity
 ## IconTexture: Interface\Icons\INV_Misc_Gem_Diamond_07

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+Rarity data refresh — snapshot as of 2026-07-17.
+
 ## 1.0.0
 
 Initial release. Achievement rarity from the Wizzleworks on every tooltip, chat line, and
