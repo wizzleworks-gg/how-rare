@@ -114,3 +114,54 @@ week boundary) and, when it changed, patch-bumps over the latest tag, stamps TOC
 CHANGELOG, tags, and dispatches the release workflow (a no-op until the CurseForge
 secret/variable are set). Whatever sits on `main` ships with that Wednesday release —
 don't park unreleased feature work on `main` across a reset.
+
+## Handover rules (HANDOVER.md)
+
+`HANDOVER.md` exists only while a build is mid-flight and is deleted when the
+theme ships. It is machine-written working state, never authority. A future
+session may only be handed things it can verify itself, or things that make
+no truth claim. Three content shapes are allowed — nothing else:
+
+- **Checklists** — open work items, in order. Doing an item reveals whether
+  it was real.
+- **Pointers** — where to look (git, the DB, a file, a spec section), never
+  what you'd find there. At most a dated "at last check" snapshot when
+  re-deriving is genuinely expensive.
+- **Questions** — anything a session believes but cannot point at is written
+  as a question to raise when it becomes load-bearing, never as a statement.
+
+Decisions never appear in a handover, in any form — labelled ones included.
+A decision lives in the code (if built) or in a committed, user-reviewed
+spec (if not); the handover points at it. A session's own inferences die
+with the session or become questions. Lessons, process commentary, and
+importance language don't appear either: a durable rule belongs in CLAUDE.md
+or nowhere, and importance is derived from the code and the live
+conversation, every time.
+
+Pick-up ritual: when `HANDOVER.md` exists, a session's first act is to
+derive current state fresh (git — across sibling repos when the theme spans
+them — and the DB where relevant), then read the handover as a to-do list,
+never as a world model. An explicit instruction in the live conversation
+overrides anything written. History lives in git; superseded text is
+deleted, not annotated. Code comments state constraints, never decisions.
+
+## Reopening decisions
+
+When the user proposes changing something — built or merely planned —
+evaluate the new idea on its merits against the code as it stands. A past
+decision is never a counterargument; "it was decided" is not a reason. Prior
+rationale may be surfaced once, as data ("the earlier reason was X — does it
+still apply?"), then the discussion proceeds from current facts only: the
+code, the data, product reasoning articulable now. Push back when you
+genuinely disagree — grounded that way, never in the written record's
+authority. "Fresh eyes" from the user means: ignore the written record
+entirely and assess on merits.
+
+## Written direction expires on ship
+
+A spec describes not-yet-built work. When the feature ships, the code
+becomes the only record: the spec's decision content is retired — deleted or
+trimmed, not annotated as history. Iteration on a shipped feature starts
+from the code as it is plus the user's new idea; there is no written
+incumbent to relitigate against. Old rationale stays available in git
+history if it is ever needed.
