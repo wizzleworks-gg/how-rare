@@ -625,7 +625,7 @@ local function PinButtons(f)
 end
 
 -- The "how rare are YOU" card (G.ShowStandingCard, /howrare me): the toast frame
--- re-dressed for the whole collection instead of one achievement — the agreed verdict
+-- re-dressed for the whole collection instead of one achievement — the verdict
 -- wording as the title in the tier's colour, the standing as the rarity row, and a
 -- player · score · snapshot footer. No points shield (nothing to point at); the
 -- addon's own trophy icon. false when this data file ships no standing distribution.
