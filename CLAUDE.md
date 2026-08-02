@@ -51,6 +51,9 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
   (zips all of `HowRare/`, so the embedded library ships in it).
 - `docs/instance-rarity.md` — parked spec: rarity on Encounter Journal, world-map
   and Group Finder surfaces (probe-proven 2026-06, not built; own session).
+- `docs/toast-story-rework.md` — proposal, not signed off: toast payload reframed
+  from population flex to a story ladder, collection verdict re-founded, noun/
+  "only" copy audit. Companion of gratz §38; sign-off required before build.
 
 ## Conventions
 
