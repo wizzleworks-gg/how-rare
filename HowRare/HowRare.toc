@@ -1,4 +1,4 @@
-## Interface: 120005, 120007
+## Interface: 120005, 120007, 120100
 ## Title: How Rare? — Achievement Rarity
 ## Notes: Achievement rarity from the Wizzleworks — the share of accounts that have each achievement, on every tooltip, chat line and achievement-panel row, plus an earned toast. Data by the Wizzleworks.
 ## Author: the Wizzleworks
