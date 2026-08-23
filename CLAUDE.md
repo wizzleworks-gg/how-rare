@@ -52,30 +52,25 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
   `/dump HowRare.AR:GetMeta()`, or `/dump LibStub("AchievementRarity-1.0"):GetMeta()`).
 - Slash: `/howrare` and `/hr` (`status`, `top [n]`, `me`, `why <link|id>`,
   `toast [n|pin]`, `share`, `debug`; bare opens options).
-- **Outbound chat (Gz!) is strictly click-to-send and unbranded.** The `[Gz!]`
-  affordance on enriched announcements of OTHERS' earns (Chat.lua; never on your
-  own) is the addon's ONLY outbound surface besides toast screenshots; nothing is
-  ever sent without a plain (unmodified) click (the no-spam rule), the reply maps
-  guild earns → GUILD and nearby earns → SAY (the send boundary allowlists exactly
-  those two), and the sent line carries no addon branding — the rarity figure is
-  the curiosity hook, and a congratulation ending in an ad reads as spam.
-- **Naming: brand headline "How Rare?", descriptive subtitle for discovery,
-  the Wizzleworks as data attribution.** The CurseForge/TOC title is **"How Rare? —
-  Achievement Rarity"**: "How Rare?" is the brand (and the question a player asks on
-  hover), and "Achievement Rarity" rides along as the searchable phrase (CurseForge
-  indexes the Name/Summary, not the folder/repo). The runtime surfaces themselves
-  stay **functional and brand-silent** — the tooltip reads `Rarity: 3%`, the panel a
-  bare `%`, the chat tag `· rarity 3%` — with **one deliberate exception: the toast
-  carries a small brand-gold "How Rare?" mark**, because it is the one surface built
-  to travel (screenshots reach non-users) and an unmarked screenshot can't answer
-  "what addon is that?" — the growth loop's last step. No other surface
-  advertises. **the Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
-  separate website product, *not* the data owner), credited only where someone asks
-  "where's this from?": the options page's about block ("Data by wizzleworks"). The
-  wordmark follows the family convention set by "gratz!": **display surfaces show the
-  stylised lowercase "wizzleworks"** (in brand gold, `ffd100`); **running prose keeps
-  "the Wizzleworks"** (READMEs, LICENSE, docs). The internal identity is `HowRare`
-  (folder, `HowRareDB`, globals); the slash stays the functional `/howrare`.
+- **Outbound chat (Gz!) is click-to-send and unbranded.** The `[Gz!]` affordance
+  on enriched announcements of OTHERS' earns (Chat.lua; never on your own) is the
+  addon's only outbound surface besides toast screenshots. Nothing is sent
+  without a plain, unmodified click. The reply maps guild earns → GUILD and
+  nearby earns → SAY; the send boundary allowlists exactly those two channels.
+  The sent line carries no addon branding.
+- **Naming.** The CurseForge/TOC title is **"How Rare? — Achievement Rarity"**:
+  "How Rare?" is the brand, "Achievement Rarity" is the searchable phrase
+  (CurseForge indexes Name and Summary, not the folder or repo). Runtime
+  surfaces are functional and brand-silent — the tooltip reads `Rarity: 3%`, the
+  panel a bare `%`, the chat tag `· rarity 3%`. **One exception: the toast
+  carries a small brand-gold "How Rare?" mark.** No other surface advertises.
+- **Attribution.** **the Wizzleworks** owns the data (gratz.gg is a separate
+  website product, not the data owner). Credit it only where someone would ask
+  where the numbers came from: the options page's about block ("Data by
+  wizzleworks"). Display surfaces use the stylised lowercase **wizzleworks** in
+  brand gold (`ffd100`); running prose (READMEs, LICENSE, docs) uses **the
+  Wizzleworks**. The internal identity is `HowRare` (folder, `HowRareDB`,
+  globals) and the slash stays `/howrare`.
 - Interface colours: rarity tiers (defined in the embedded library) reuse
   `ITEM_QUALITY_COLORS` (loot-quality bands); the one brand gold is `ffd100`
   (`G.GOLD`) — How Rare?'s own, used for attribution and the off-snapshot fallback
