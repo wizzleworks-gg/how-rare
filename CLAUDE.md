@@ -8,17 +8,13 @@ the Wizzleworks, which this addon embeds and is the **reference consumer** of.
 
 ## Origin
 
-Carved out of the `gratz-addon` monolith (2026-06-27) as the first of a planned
-three-addon split — rarity is the horizontal data layer. The board (curated
-"Midnight" race, rankings, inspect engine) and an instance-tooltips addon are the
-other two; the architecture and the rationale for the split live in
-`gratz-addon/docs/addon-architecture.md`. This repo is **rarity only** — no HUD
-bar, no curated browser, no scanner/inspect/ranking code.
+Carved out of the `gratz-addon` monolith (2026-06-27); rarity is the horizontal
+data layer. This repo is **rarity only** — no HUD bar, no curated browser, no
+scanner/inspect/ranking code.
 
 The rarity **data** was then extracted into its own embeddable LibStub library,
 **AchievementRarity** (sibling `achievement-rarity` repo, MIT), with How Rare? as its
-reference consumer — the decision + plan are in
-`gratz-addon/docs/rarity-data-library.md`. The numbers are produced in the sibling
+reference consumer. The numbers are produced in the sibling
 `gratz` repo (`public.achievement_rarity` + `public.rarity_meta`) and exported into
 the library by gratz's `scripts/export-rarity-library.py`; How Rare? embeds a copy of
 that library under `HowRare/Libs/` and delegates every rarity lookup to it.
@@ -49,11 +45,6 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
     addon root by the client; **must not** be listed in the TOC.
 - `scripts/release.sh` — builds the CurseForge upload zip from the TOC version
   (zips all of `HowRare/`, so the embedded library ships in it).
-- `docs/instance-rarity.md` — parked spec: rarity on Encounter Journal, world-map
-  and Group Finder surfaces (probe-proven 2026-06, not built; own session).
-- `docs/toast-story-rework.md` — proposal, not signed off: toast payload reframed
-  from population flex to a story ladder, collection verdict re-founded, noun/
-  "only" copy audit. Companion of gratz §38; sign-off required before build.
 
 ## Conventions
 
@@ -77,17 +68,14 @@ that library under `HowRare/Libs/` and delegates every rarity lookup to it.
   bare `%`, the chat tag `· rarity 3%` — with **one deliberate exception: the toast
   carries a small brand-gold "How Rare?" mark**, because it is the one surface built
   to travel (screenshots reach non-users) and an unmarked screenshot can't answer
-  "what addon is that?" — the growth loop's last step (matches the architecture doc's
-  §11 attribution table: toast = the highest-ROI credit surface). No other surface
+  "what addon is that?" — the growth loop's last step. No other surface
   advertises. **the Wizzleworks** is the data owner (the umbrella brand; gratz.gg is a
-  separate website product, *not* the data owner — see
-  `gratz-addon/docs/rarity-data-library.md`), credited only where someone asks
+  separate website product, *not* the data owner), credited only where someone asks
   "where's this from?": the options page's about block ("Data by wizzleworks"). The
   wordmark follows the family convention set by "gratz!": **display surfaces show the
   stylised lowercase "wizzleworks"** (in brand gold, `ffd100`); **running prose keeps
   "the Wizzleworks"** (READMEs, LICENSE, docs). The internal identity is `HowRare`
-  (folder, `HowRareDB`, globals); the slash stays the functional `/howrare`. See §11
-  of the architecture doc.
+  (folder, `HowRareDB`, globals); the slash stays the functional `/howrare`.
 - Interface colours: rarity tiers (defined in the embedded library) reuse
   `ITEM_QUALITY_COLORS` (loot-quality bands); the one brand gold is `ffd100`
   (`G.GOLD`) — How Rare?'s own, used for attribution and the off-snapshot fallback
