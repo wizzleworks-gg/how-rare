@@ -110,9 +110,11 @@ jobs:
           [ -n "$notes" ] || notes="Release ${V}"
           metadata="$(jq -nc --argjson gv "$ids" --arg cl "$notes" \
             '{changelog: $cl, changelogType: "markdown", releaseType: "release", gameVersions: $gv}')"
+          # --form-string: metadata is passed literally — plain -F would parse
+          # ;/@/< inside the changelog text as form options and mangle the JSON.
           cf_call "upload" upload.json \
             -H "X-Api-Token: ${CF_API_KEY}" \
-            -F "metadata=${metadata}" \
+            --form-string "metadata=${metadata}" \
             -F "file=@${ZIP}" \
             "https://wow.curseforge.com/api/projects/${CF_PROJECT_ID}/upload-file"
           cat upload.json
