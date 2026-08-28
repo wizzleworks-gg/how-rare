@@ -55,10 +55,33 @@ jobs:
             exit 0
           fi
           ZIP="${{ steps.zip.outputs.zip }}"
+          # One reported HTTP call: body to $2, status to stdout, and on a >=400 the
+          # response body is printed before failing. curl's own -f swallows both the
+          # status and the error document, so a rejected call surfaces as a bare
+          # exit code with no cause; CurseForge answers with a JSON error object.
+          cf_call() {  # $1 = label, $2 = body file, rest = curl args
+            local label="$1" body="$2"
+            shift 2
+            local code
+            code="$(curl -sS --connect-timeout 20 -m 180 -o "$body" -w '%{http_code}' "$@")" || {
+              echo "error: ${label} — no HTTP response (connection failed or timed out)" >&2
+              return 1
+            }
+            echo "${label}: HTTP ${code}"
+            if [ "$code" -ge 400 ]; then
+              echo "error: ${label} — CurseForge returned ${code}, body follows:" >&2
+              cat "$body" >&2
+              echo >&2
+              return 1
+            fi
+          }
+
           # Map each TOC interface number (e.g. 120005 -> "12.0.5") to a
           # CurseForge game-version id from its versions endpoint.
           ifaces="$(grep -m1 '^## Interface:' HowRare/HowRare.toc | sed 's/^## Interface://' | tr ',' ' ')"
-          versions_json="$(curl -sf -H "X-Api-Token: ${CF_API_KEY}" https://wow.curseforge.com/api/game/versions)"
+          cf_call "game versions" versions.json \
+            -H "X-Api-Token: ${CF_API_KEY}" https://wow.curseforge.com/api/game/versions
+          versions_json="$(cat versions.json)"
           ids='[]'
           for n in $ifaces; do
             n="$(echo "$n" | tr -cd '0-9')"
@@ -87,8 +110,11 @@ jobs:
           [ -n "$notes" ] || notes="Release ${V}"
           metadata="$(jq -nc --argjson gv "$ids" --arg cl "$notes" \
             '{changelog: $cl, changelogType: "markdown", releaseType: "release", gameVersions: $gv}')"
-          curl -sf -H "X-Api-Token: ${CF_API_KEY}" \
+          cf_call "upload" upload.json \
+            -H "X-Api-Token: ${CF_API_KEY}" \
             -F "metadata=${metadata}" \
             -F "file=@${ZIP}" \
             "https://wow.curseforge.com/api/projects/${CF_PROJECT_ID}/upload-file"
+          cat upload.json
+          echo
           echo "Uploaded ${ZIP} to CurseForge project ${CF_PROJECT_ID}."
