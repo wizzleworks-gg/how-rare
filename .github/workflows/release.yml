@@ -45,6 +45,7 @@ jobs:
       #   - secret  CF_API_KEY     (a CurseForge API token)
       #   - variable CF_PROJECT_ID (the numeric project id, public)
       - name: Upload to CurseForge
+        id: upload
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
           CF_PROJECT_ID: ${{ vars.CF_PROJECT_ID }}
@@ -52,6 +53,7 @@ jobs:
           set -euo pipefail
           if [ -z "${CF_API_KEY:-}" ] || [ -z "${CF_PROJECT_ID:-}" ]; then
             echo "CF_API_KEY secret or CF_PROJECT_ID variable not set — built ${{ steps.zip.outputs.zip }} but skipping upload."
+            echo "uploaded=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           ZIP="${{ steps.zip.outputs.zip }}"
@@ -119,4 +121,30 @@ jobs:
             "https://wow.curseforge.com/api/projects/${CF_PROJECT_ID}/upload-file"
           cat upload.json
           echo
+          echo "uploaded=true" >> "$GITHUB_OUTPUT"
           echo "Uploaded ${ZIP} to CurseForge project ${CF_PROJECT_ID}."
+
+      - name: Notify
+        if: always()
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          JOB_STATUS: ${{ job.status }}
+          UPLOADED: ${{ steps.upload.outputs.uploaded }}
+          V: ${{ steps.ver.outputs.version }}
+        run: |
+          set -uo pipefail
+          [ -n "${NTFY_TOPIC:-}" ] || { echo "NTFY_TOPIC secret not set — no notification."; exit 0; }
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ "$JOB_STATUS" != "success" ]; then
+            title="How Rare? release FAILED"; prio=high; tags=rotating_light
+            body="v${V:-?} — ${run_url}"
+          elif [ "$UPLOADED" = "true" ]; then
+            title="How Rare? v${V} released"; prio=default; tags=package
+            body="Uploaded to CurseForge"
+          else
+            title="How Rare? v${V} built, not uploaded"; prio=default; tags=warning
+            body="CF_API_KEY / CF_PROJECT_ID not set on the repo. ${run_url}"
+          fi
+          printf '%s\n' "$body" | curl -fsS -m 10 \
+            -H "Title: $title" -H "Priority: $prio" -H "Tags: $tags" \
+            --data-binary "@-" "https://ntfy.sh/${NTFY_TOPIC}" >/dev/null
