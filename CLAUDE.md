@@ -94,9 +94,9 @@ TOC, then tag `vX.Y.Z` and push the tag — CI builds the zip and (once `CF_API_
 `README.md`.
 
 That hand flow is for **feature releases** (minor/major bumps). **Data-only releases
-are automated**: `.github/workflows/data-refresh.yml` re-embeds the library repo's
-current snapshot every Wednesday (just after both regions' weekly resets — the WoW
-week boundary) and, when it changed, patch-bumps over the latest tag, stamps TOC +
-CHANGELOG, tags, and dispatches the release workflow (a no-op until the CurseForge
-secret/variable are set). Whatever sits on `main` ships with that Wednesday release —
-don't park unreleased feature work on `main` across a reset.
+are automated**: every day the gratz box (gratz repo, `scripts/cron-howrare-publish.sh`)
+re-embeds the library repo's current snapshot into its checkout of this repo and,
+when it changed, patch-bumps over the latest tag, stamps TOC + CHANGELOG, commits,
+tags and pushes; the tag fires the release workflow (its upload step is skipped
+while the CurseForge secret/variable are unset). Whatever sits on `main` ships with
+that day's release — don't park unreleased feature work on `main`.
