@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.81
+
+Rarity data refresh — snapshot as of 2026-11-19.
+
 ## 1.0.80
 
 Rarity data refresh — snapshot as of 2026-11-18.
